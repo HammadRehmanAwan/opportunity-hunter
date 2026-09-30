@@ -211,10 +211,14 @@
     $('.angle', el).textContent = o.outreach_angle || '';
     $('.team', el).textContent = o.fde_team_context || '';
     $('.about', el).textContent = [o.what_they_do, o.hq, o.size_text].filter(Boolean).join(' · ');
+    $('.caveats', el).textContent = o.fit_notes || '';
+    const others = (o.other_roles || []).filter((r) => r && r.role_title);
+    $('.also-open', el).innerHTML = others.map((r) => isHttp(r.job_url) ? `<a href="${esc(r.job_url)}" target="_blank" rel="noopener">${esc(r.role_title)}${r.location ? ` (${esc(r.location)})` : ''} ↗</a>` : `${esc(r.role_title)}${r.location ? ` (${esc(r.location)})` : ''}`).join(' · ');
     $$('.kv div', el).forEach((d) => { if (!$('dd', d).textContent.trim()) d.remove(); });
 
     const tags = [];
     if (o.region) tags.push(['tag-accent', o.region]);
+    if (o.company_type) tags.push(['', o.company_type]);
     (o.tags || []).forEach((t) => tags.push(['', t]));
     if (o.verification) {
       tags.push(o.verification.job_url_live === true ? ['tag-ok', 'job link verified live'] : ['tag-warn', 'job link unverified']);

@@ -123,6 +123,8 @@ input[type="checkbox"]{accent-color:var(--accent);width:16px;height:16px}
 .kv dt{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);padding-top:3px}
 .kv dd{color:var(--ink-dim)}
 .kv div:empty,.kv dd:empty{display:none}
+.kv dd a{text-decoration:underline dotted;text-underline-offset:3px}
+.kv dd a:hover{color:var(--accent)}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
 .tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;border:1px solid var(--line);border-radius:30px;padding:4px 10px;color:var(--ink-dim);white-space:nowrap}
 .tag.tag-wrap{white-space:normal;overflow-wrap:anywhere}
