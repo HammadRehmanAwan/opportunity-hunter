@@ -19,7 +19,7 @@
     <div class="nav-actions">
       <button class="btn btn-ghost btn-sm" id="btn-profile" type="button" title="Edit the sender profile used in every draft">Your profile</button>
       <button class="btn btn-ghost btn-sm" id="btn-export" type="button" title="Download everything as CSV">Export CSV</button>
-      <button class="icon-btn" id="btn-theme" type="button" aria-label="Toggle dark / light theme" title="Toggle theme">
+      <button class="icon-btn" id="btn-theme" type="button" aria-label="Switch theme" aria-pressed="false" title="Toggle theme">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
       </button>
     </div>
@@ -31,7 +31,7 @@
     <p class="label"><span class="ln" aria-hidden="true"></span>Scan → Filter → Enrich → Score → Gate → Outreach</p>
     <h1>Every open <em>Forward Deployed</em> AI Engineer role, the people behind it, and the message to send.</h1>
     <p class="sum">Built like the client-hunting pipeline: each opportunity is scored 1–10 with a rationale, comes with the hiring manager or recruiter to approach on LinkedIn, a verified or best-guess email, and a drafted email and LinkedIn note you can send with one click. Your approvals, notes and edits stay in this browser.</p>
-    <div class="stats" id="stats" aria-live="polite"></div>
+    <div class="stats" id="stats"></div>
   </section>
 
   <section class="controls" aria-label="Filters">
@@ -116,12 +116,12 @@
 
 <!-- Profile drawer -->
 <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-<aside class="drawer" id="drawer" aria-label="Your profile" hidden>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
   <div class="drawer-head">
-    <h2>Your profile</h2>
+    <h2 id="drawer-title">Your profile</h2>
     <button class="icon-btn" id="btn-drawer-close" type="button" aria-label="Close">✕</button>
   </div>
-  <p class="fine">Used to fill <code>{{my_name}}</code>, <code>{{my_email}}</code>, <code>{{my_linkedin}}</code>, <code>{{my_headline}}</code>, <code>{{my_cv}}</code> and <code>{{my_phone}}</code> in every draft. Saved in this browser only.</p>
+  <p class="fine">Used to fill <code>{{my_name}}</code>, <code>{{my_email}}</code>, <code>{{my_linkedin}}</code>, <code>{{my_headline}}</code>, <code>{{my_cv}}</code> and <code>{{my_phone}}</code> in every draft. Defaults come from <code>data/profile.json</code> (published with the site); your edits are saved in this browser only.</p>
   <form id="profile-form" class="form">
     <label>Full name<input name="name" type="text" required></label>
     <label>Email<input name="email" type="email" required></label>
@@ -146,12 +146,12 @@
   <h3>Tracker data</h3>
   <div class="row">
     <button class="btn btn-ghost btn-sm" type="button" id="btn-backup">Download tracker JSON</button>
-    <label class="btn btn-ghost btn-sm file-btn">Restore JSON<input type="file" id="file-restore" accept="application/json" hidden></label>
+    <label class="btn btn-ghost btn-sm file-btn">Restore JSON<input type="file" id="file-restore" accept="application/json" class="visually-hidden"></label>
     <button class="btn btn-danger btn-sm" type="button" id="btn-wipe">Clear tracker</button>
   </div>
 </aside>
 
-<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <template id="tpl-card">
   <article class="card" data-id="">
@@ -209,9 +209,9 @@
           <div class="to-line"></div>
         </div>
         <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-tab="email" role="tab">Email</button>
-          <button type="button" class="tab" data-tab="note" role="tab">LinkedIn connection note</button>
-          <button type="button" class="tab" data-tab="inmail" role="tab">LinkedIn message</button>
+          <button type="button" class="tab active" data-tab="email" role="tab" aria-selected="true">Email</button>
+          <button type="button" class="tab" data-tab="note" role="tab" aria-selected="false" tabindex="-1">LinkedIn connection note</button>
+          <button type="button" class="tab" data-tab="inmail" role="tab" aria-selected="false" tabindex="-1">LinkedIn message</button>
         </div>
         <div class="pane" data-pane="email">
           <label>Subject<input class="d-subject" type="text"></label>
@@ -219,14 +219,14 @@
           <div class="row">
             <button type="button" class="btn btn-primary act-send">Send email ↗</button>
             <button type="button" class="btn btn-ghost act-copy-email">Copy email</button>
-            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="email">Reset draft</button>
+            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="email" hidden>Reset draft</button>
           </div>
         </div>
         <div class="pane" data-pane="note" hidden>
           <label>Connection note <span class="count note-count"></span><textarea class="d-note" rows="5" maxlength="300"></textarea></label>
           <div class="row">
             <button type="button" class="btn btn-primary act-linkedin" data-kind="note">Copy note &amp; open LinkedIn ↗</button>
-            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="note">Reset draft</button>
+            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="note" hidden>Reset draft</button>
           </div>
           <p class="fine">LinkedIn caps connection notes at 300 characters (200 on some accounts). Paste it under “Connect → Add a note”.</p>
         </div>
@@ -234,7 +234,7 @@
           <label>Message<textarea class="d-inmail" rows="10"></textarea></label>
           <div class="row">
             <button type="button" class="btn btn-primary act-linkedin" data-kind="inmail">Copy message &amp; open LinkedIn ↗</button>
-            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="inmail">Reset draft</button>
+            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="inmail" hidden>Reset draft</button>
           </div>
           <p class="fine">Paste into “Message” on their profile (or InMail if you're not connected).</p>
         </div>

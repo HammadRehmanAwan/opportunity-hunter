@@ -9,9 +9,12 @@
 
   const KEYS = { tracker: 'oh:tracker:v1', profile: 'oh:profile:v1', theme: 'oh:theme', filters: 'oh:filters:v1' };
   const STATUS_LABEL = { new: 'New', shortlisted: 'Shortlisted', contacted: 'Contacted', replied: 'Replied', interviewing: 'Interviewing', offer: 'Offer', passed: 'Passed / rejected' };
+  const ACTIVE = ['contacted', 'replied', 'interviewing', 'offer'];
+  const EMAIL_STATUS = ['verified_public', 'pattern_guess'];
 
   const load = (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode etc. */ } };
+  const plain = (o) => Object.assign(Object.create(null), o && typeof o === 'object' ? o : {});
 
   const DEFAULT_PROFILE = Object.assign({
     name: 'Your name', email: 'you@example.com', phone: '', linkedin: '', cv_url: '', headline: '',
@@ -20,7 +23,7 @@
 
   let DATA = Array.isArray(window.OH_DATA) ? window.OH_DATA : [];
   let META = window.OH_META || {};
-  let tracker = load(KEYS.tracker, {});
+  let tracker = plain(load(KEYS.tracker, {}));
   let profile = Object.assign({}, DEFAULT_PROFILE, load(KEYS.profile, {}));
   let filters = Object.assign({ q: '', region: 'any', remote: 'any', minScore: 1, status: 'any', sort: 'score', emailOnly: false, verifiedOnly: false }, load(KEYS.filters, {}));
 
@@ -28,12 +31,14 @@
   const firstName = (n) => (n || '').trim().split(/\s+/)[0] || '';
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const isHttp = (u) => /^https?:\/\//i.test(u || '');
+  const isEmail = (e) => /^[^\s@,;:<>?&"'()[\]\\]+@[^\s@,;:<>?&"'()[\]\\/]+\.[a-z]{2,}$/i.test(e || '');
+  const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   const nowIso = () => new Date().toISOString();
   const fmtDate = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); };
 
   function toast(msg) {
-    const t = $('#toast'); t.textContent = msg; t.hidden = false;
-    clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 2600);
+    const t = $('#toast'); t.classList.add('show'); t.textContent = msg;
+    clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; }, 2600);
   }
 
   async function copyText(text) {
@@ -46,13 +51,16 @@
     }
   }
 
-  function state(id) { if (!tracker[id]) tracker[id] = { status: 'new', notes: '', drafts: {}, contact: 0 }; return tracker[id]; }
-  function persist() { save(KEYS.tracker, tracker); renderStats(); }
+  function state(id) {
+    if (!Object.hasOwn(tracker, id)) tracker[id] = { status: 'new', notes: '', drafts: {}, contact: 0 };
+    const s = tracker[id]; if (!s.drafts || typeof s.drafts !== 'object') s.drafts = {}; return s;
+  }
+  function persist() { save(KEYS.tracker, tracker); }
 
   // Picks the email to use for a contact: their own published address, else a pattern guess, else the careers inbox.
   function contactEmail(o, c) {
-    if (c && c.email) return { email: c.email, status: c.email_status || 'unknown', source: c.email_source_url || '' };
-    if (o.careers_email) return { email: o.careers_email, status: 'careers', source: o.careers_email_source_url || '' };
+    if (c && isEmail(c.email)) return { email: c.email, status: EMAIL_STATUS.includes(c.email_status) ? c.email_status : 'unknown', source: c.email_source_url || '' };
+    if (isEmail(o.careers_email)) return { email: o.careers_email, status: 'careers', source: o.careers_email_source_url || '' };
     return { email: '', status: 'none', source: '' };
   }
 
@@ -67,32 +75,34 @@
       my_linkedin: profile.linkedin || '', my_phone: profile.phone || '', my_cv: profile.cv_url || '', my_headline: profile.headline || '',
       signature: profile.signature || profile.name || '',
     };
-    return String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in map ? map[k] : m));
+    return String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (Object.hasOwn(map, k) ? map[k] : m));
   }
 
-  function draft(o, field) {
-    const s = state(o.id);
-    if (s.drafts && typeof s.drafts[field] === 'string') return s.drafts[field];
-    return (o.drafts && o.drafts[field]) || '';
+  // Edited drafts are stored per opportunity AND per recipient key, so switching contact falls back to the template.
+  function draft(o, key, field) {
+    const s = state(o.id); const edited = s.drafts[key];
+    if (edited && typeof edited[field] === 'string') return { text: edited[field], edited: true };
+    return { text: (o.drafts && o.drafts[field]) || '', edited: false };
+  }
+
+  function mailLink(to, subject, body) {
+    const enc = encodeURIComponent; const addr = isEmail(to) ? to : '';
+    if (profile.mail_client === 'gmail') return `https://mail.google.com/mail/?view=cm&fs=1&to=${enc(addr)}&su=${enc(subject)}&body=${enc(body)}`;
+    if (profile.mail_client === 'outlook') return `https://outlook.office.com/mail/deeplink/compose?to=${enc(addr)}&subject=${enc(subject)}&body=${enc(body)}`;
+    return `mailto:${addr}?subject=${enc(subject)}&body=${enc(body)}`;
   }
 
   // Navigation seam: tests (or a host page) can set window.OH_NAV(url, newTab) to observe navigations.
   const go = (url, newTab) => { if (typeof window.OH_NAV === 'function') return window.OH_NAV(url, newTab); if (newTab) window.open(url, '_blank', 'noopener'); else window.location.href = url; };
 
-  function mailLink(to, subject, body) {
-    const enc = encodeURIComponent;
-    if (profile.mail_client === 'gmail') return `https://mail.google.com/mail/?view=cm&fs=1&to=${enc(to)}&su=${enc(subject)}&body=${enc(body)}`;
-    if (profile.mail_client === 'outlook') return `https://outlook.office.com/mail/deeplink/compose?to=${enc(to)}&subject=${enc(subject)}&body=${enc(body)}`;
-    return `mailto:${enc(to)}?subject=${enc(subject)}&body=${enc(body)}`;
-  }
-
   // ---------- theme ----------
-  function applyTheme(t) { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); }
+  function effectiveTheme() { return document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); }
+  function applyTheme(t) {
+    if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+    const b = $('#btn-theme'); if (b) { const eff = effectiveTheme(); b.setAttribute('aria-label', eff === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'); b.setAttribute('aria-pressed', String(eff === 'dark')); }
+  }
   applyTheme(load(KEYS.theme, null));
-  $('#btn-theme').addEventListener('click', () => {
-    const cur = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-    const next = cur === 'dark' ? 'light' : 'dark'; applyTheme(next); save(KEYS.theme, next);
-  });
+  $('#btn-theme').addEventListener('click', () => { const next = effectiveTheme() === 'dark' ? 'light' : 'dark'; applyTheme(next); save(KEYS.theme, next); });
 
   // ---------- stats ----------
   function renderStats() {
@@ -100,8 +110,8 @@
     const uk = DATA.filter((o) => o.region === 'UK').length;
     const remote = DATA.filter((o) => o.region === 'Remote' || (o.remote_policy || '').toLowerCase() === 'remote').length;
     const contacts = DATA.reduce((n, o) => n + (o.contacts || []).length, 0);
-    const emails = DATA.reduce((n, o) => n + (o.contacts || []).filter((c) => c.email).length + (o.careers_email ? 1 : 0), 0);
-    const contacted = Object.values(tracker).filter((s) => ['contacted', 'replied', 'interviewing', 'offer'].includes(s.status)).length;
+    const emails = DATA.reduce((n, o) => n + (o.contacts || []).filter((c) => isEmail(c.email)).length + (isEmail(o.careers_email) ? 1 : 0), 0);
+    const contacted = DATA.filter((o) => ACTIVE.includes(state(o.id).status)).length;
     $('#stats').innerHTML = [
       ['Open roles', total, ''], ['UK / London', uk, `+${remote} remote`], ['People to approach', contacts, ''], ['Email addresses', emails, ''], ['Contacted', contacted, `of ${total}`],
     ].map(([k, v, s]) => `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${esc(v)}${s ? `<small>${esc(s)}</small>` : ''}</div></div>`).join('');
@@ -111,14 +121,14 @@
   // ---------- filtering ----------
   function visible() {
     const q = filters.q.trim().toLowerCase();
-    let rows = DATA.filter((o) => {
+    const rows = DATA.filter((o) => {
       const s = state(o.id);
       if (filters.region !== 'any' && o.region !== filters.region) return false;
       if (filters.remote !== 'any' && (o.remote_policy || 'unknown').toLowerCase() !== filters.remote) return false;
-      if ((o.score || 0) < filters.minScore) return false;
+      if (o.score != null && o.score < filters.minScore) return false;
       if (filters.status !== 'any' && s.status !== filters.status) return false;
-      if (filters.emailOnly && !(o.careers_email || (o.contacts || []).some((c) => c.email))) return false;
-      if (filters.verifiedOnly && !(o.contacts || []).some((c) => c.verified)) return false;
+      if (filters.emailOnly && !(isEmail(o.careers_email) || (o.contacts || []).some((c) => isEmail(c.email)))) return false;
+      if (filters.verifiedOnly && !(o.contacts || []).some((c) => c.verified === true)) return false;
       if (q) {
         const hay = [o.company, o.role_title, o.location, o.summary, o.rationale, o.outreach_angle, o.what_they_do, ...(o.contacts || []).map((c) => `${c.name} ${c.title}`)].join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
@@ -134,10 +144,13 @@
     return rows.sort(by[filters.sort] || by.score);
   }
 
-  function bindFilters() {
+  function setFilterInputs() {
     const f = filters;
     $('#f-q').value = f.q; $('#f-region').value = f.region; $('#f-remote').value = f.remote; $('#f-score').value = f.minScore; $('#f-score-out').value = f.minScore;
     $('#f-status').value = f.status; $('#f-sort').value = f.sort; $('#f-email').checked = f.emailOnly; $('#f-verified').checked = f.verifiedOnly;
+  }
+  function bindFilters() {
+    const f = filters; setFilterInputs();
     const upd = () => { save(KEYS.filters, filters); renderList(); };
     $('#f-q').addEventListener('input', (e) => { f.q = e.target.value; upd(); });
     $('#f-region').addEventListener('change', (e) => { f.region = e.target.value; upd(); });
@@ -147,14 +160,14 @@
     $('#f-sort').addEventListener('change', (e) => { f.sort = e.target.value; upd(); });
     $('#f-email').addEventListener('change', (e) => { f.emailOnly = e.target.checked; upd(); });
     $('#f-verified').addEventListener('change', (e) => { f.verifiedOnly = e.target.checked; upd(); });
-    $('#btn-clear').addEventListener('click', () => { Object.assign(filters, { q: '', region: 'any', remote: 'any', minScore: 1, status: 'any', sort: 'score', emailOnly: false, verifiedOnly: false }); bindValues(); upd(); });
-    function bindValues() { $('#f-q').value = ''; $('#f-region').value = 'any'; $('#f-remote').value = 'any'; $('#f-score').value = 1; $('#f-score-out').value = 1; $('#f-status').value = 'any'; $('#f-sort').value = 'score'; $('#f-email').checked = false; $('#f-verified').checked = false; }
+    $('#btn-clear').addEventListener('click', () => { Object.assign(filters, { q: '', region: 'any', remote: 'any', minScore: 1, status: 'any', sort: 'score', emailOnly: false, verifiedOnly: false }); setFilterInputs(); upd(); });
   }
 
   // ---------- rendering ----------
   const LI_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>';
 
-  function scoreClass(n) { return n >= 8 ? 's-high' : n >= 6 ? 's-mid' : ''; }
+  function scoreClass(n) { return n == null ? 's-none' : n >= 8 ? 's-high' : n >= 6 ? 's-mid' : 's-low'; }
+  function peopleSearchUrl(o) { return isHttp(o.linkedin_people_search_url) ? o.linkedin_people_search_url : `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${o.company} forward deployed engineer OR recruiter OR head of engineering`)}`; }
 
   function renderList() {
     const rows = visible();
@@ -173,21 +186,23 @@
     const s = state(o.id);
     const el = tpl.content.firstElementChild.cloneNode(true);
     el.dataset.id = o.id; el.dataset.status = s.status;
+    const cid = slug(o.id);
+    const titleEl = $('.company', el); titleEl.id = `co-${cid}`; el.setAttribute('aria-labelledby', titleEl.id);
 
-    const sc = $('.score', el); sc.classList.add(scoreClass(o.score || 0)); $('.score-n', el).textContent = o.score ?? '–';
-    $('.company', el).innerHTML = isHttp(o.company_url) ? `<a href="${esc(o.company_url)}" target="_blank" rel="noopener">${esc(o.company)}</a>` : esc(o.company);
+    $('.score', el).classList.add(scoreClass(o.score)); $('.score-n', el).textContent = o.score ?? '–';
+    titleEl.innerHTML = isHttp(o.company_url) ? `<a href="${esc(o.company_url)}" target="_blank" rel="noopener">${esc(o.company)}</a>` : esc(o.company);
     $('.role', el).textContent = o.role_title || '';
     $('.meta', el).innerHTML = [o.location, o.remote_policy && o.remote_policy !== 'unknown' ? o.remote_policy : '', o.employment_type, o.salary_text, o.posted_or_seen ? `seen ${o.posted_or_seen}` : '']
       .filter(Boolean).map((t) => `<span>${esc(t)}</span>`).join('');
 
     const job = $('.job-link', el);
-    if (isHttp(o.job_url)) job.href = o.job_url; else { job.removeAttribute('href'); job.classList.add('btn-disabled'); job.textContent = 'No live link'; }
+    if (isHttp(o.job_url)) job.href = o.job_url; else job.replaceWith(Object.assign(document.createElement('span'), { className: 'tag tag-warn', textContent: 'No live link' }));
 
-    const st = $('.status', el); st.value = s.status;
+    const st = $('.status', el); st.value = s.status; st.setAttribute('aria-label', `Status for ${o.company}`);
     st.addEventListener('change', () => {
       s.status = st.value; el.dataset.status = s.status;
-      if (['contacted', 'replied', 'interviewing', 'offer'].includes(s.status) && !s.contacted_at) s.contacted_at = nowIso();
-      persist(); renderContactedLine(o, el); toast(`${o.company}: ${STATUS_LABEL[s.status]}`);
+      if (ACTIVE.includes(s.status) && !s.contacted_at) s.contacted_at = nowIso();
+      persist(); renderStats(); renderContactedLine(o, el); toast(`${o.company}: ${STATUS_LABEL[s.status]}`);
     });
 
     $('.rationale', el).textContent = o.rationale || o.summary || '';
@@ -202,10 +217,10 @@
     if (o.region) tags.push(['tag-accent', o.region]);
     (o.tags || []).forEach((t) => tags.push(['', t]));
     if (o.verification) {
-      tags.push(o.verification.job_url_live ? ['tag-ok', 'job link verified live'] : ['tag-warn', 'job link unverified']);
+      tags.push(o.verification.job_url_live === true ? ['tag-ok', 'job link verified live'] : ['tag-warn', 'job link unverified']);
       if (o.verification.overall_confidence) tags.push([o.verification.overall_confidence === 'high' ? 'tag-ok' : o.verification.overall_confidence === 'low' ? 'tag-bad' : 'tag-warn', `${o.verification.overall_confidence} confidence`]);
     }
-    if (o.email_pattern) tags.push(['', `pattern ${o.email_pattern}${o.email_pattern_confidence ? ` (${o.email_pattern_confidence})` : ''}`]);
+    if (o.email_pattern) tags.push(['tag-wrap', `pattern ${o.email_pattern}${o.email_pattern_confidence ? ` (${o.email_pattern_confidence})` : ''}`]);
     $('.tags', el).innerHTML = tags.map(([c, t]) => `<span class="tag ${c}">${esc(t)}</span>`).join('');
 
     const vl = $('.verify-line', el);
@@ -220,12 +235,12 @@
     contacts.forEach((c, i) => {
       const li = document.createElement('li'); li.className = 'contact';
       const em = contactEmail(o, c);
-      const emailHtml = c.email
+      const emailHtml = isEmail(c.email)
         ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a> <span class="tag ${c.email_status === 'verified_public' ? 'tag-ok' : 'tag-guess'}">${c.email_status === 'verified_public' ? 'published' : 'guess'}</span>${isHttp(c.email_source_url) ? ` <a class="fine" href="${esc(c.email_source_url)}" target="_blank" rel="noopener">src</a>` : ''}`
         : (em.email ? `<span class="fine">no personal email · use ${esc(em.email)}</span>` : '<span class="fine">no email found</span>');
       li.innerHTML = `
         <div class="who">
-          <div class="name">${esc(c.name)} ${c.verified ? '<span class="verified" title="Title and profile re-checked">✓ verified</span>' : '<span class="unverified" title="Could not be independently re-checked">unverified</span>'}</div>
+          <div class="name">${esc(c.name)} ${c.verified === true ? '<span class="verified" title="Title and profile re-checked">✓ verified</span>' : '<span class="unverified" title="Could not be independently re-checked">unverified</span>'}</div>
           <div class="title">${esc(c.title)}${c.role_type ? ` · <span class="tag">${esc(String(c.role_type).replace(/_/g, ' '))}</span>` : ''}</div>
           ${c.why_them ? `<div class="why">${esc(c.why_them)}</div>` : ''}
           <div class="email">${emailHtml}</div>
@@ -233,72 +248,87 @@
         <div class="links">
           ${isHttp(c.linkedin_url) ? `<a class="li-btn" href="${esc(c.linkedin_url)}" target="_blank" rel="noopener">${LI_ICON}LinkedIn</a>` : '<span class="fine">no profile link</span>'}
           ${isHttp(c.evidence_url) ? `<a class="fine" href="${esc(c.evidence_url)}" target="_blank" rel="noopener">evidence ↗</a>` : ''}
-          <button type="button" class="btn btn-ghost btn-sm act-pick" data-i="${i}">Draft to ${esc(firstName(c.name))}</button>
+          <button type="button" class="btn btn-ghost btn-sm act-pick" data-i="${i}" aria-label="Draft outreach to ${esc(c.name)} at ${esc(o.company)}">Draft to ${esc(firstName(c.name))}</button>
         </div>`;
       ul.appendChild(li);
     });
-    $$('.act-pick', el).forEach((b) => b.addEventListener('click', () => { s.contact = Number(b.dataset.i); persist(); renderOutreach(o, el); $('.outreach', el).open = true; $('.outreach', el).scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }));
+    $$('.act-pick', el).forEach((b) => b.addEventListener('click', () => {
+      s.contact = Number(b.dataset.i); persist(); renderOutreach(o, el);
+      const det = $('.outreach', el); det.open = true; det.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $('.contact-pick', el).focus({ preventScroll: true }); toast(`Drafts switched to ${contacts[s.contact].name}`);
+    }));
 
     const ps = $('.people-search', el);
-    const psUrl = o.linkedin_people_search_url || `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${o.company} forward deployed engineer OR recruiter OR head of engineering`)}`;
-    ps.innerHTML = `Find more: <a href="${esc(psUrl)}" target="_blank" rel="noopener">LinkedIn people search ↗</a>${isHttp(o.linkedin_company_url) ? ` · <a href="${esc(o.linkedin_company_url)}" target="_blank" rel="noopener">company page ↗</a>` : ''}${isHttp(o.careers_url) ? ` · <a href="${esc(o.careers_url)}" target="_blank" rel="noopener">careers ↗</a>` : ''}${o.careers_email ? ` · careers inbox <a href="mailto:${esc(o.careers_email)}">${esc(o.careers_email)}</a>` : ''}`;
+    ps.innerHTML = `Find more: <a href="${esc(peopleSearchUrl(o))}" target="_blank" rel="noopener">LinkedIn people search ↗</a>${isHttp(o.linkedin_company_url) ? ` · <a href="${esc(o.linkedin_company_url)}" target="_blank" rel="noopener">company page ↗</a>` : ''}${isHttp(o.careers_url) ? ` · <a href="${esc(o.careers_url)}" target="_blank" rel="noopener">careers ↗</a>` : ''}${isEmail(o.careers_email) ? ` · careers inbox <a href="mailto:${esc(o.careers_email)}">${esc(o.careers_email)}</a>` : ''}`;
+
+    // tabs: ids + aria wiring (once per card)
+    $$('.tab', el).forEach((t) => { t.id = `tab-${cid}-${t.dataset.tab}`; t.setAttribute('aria-controls', `pane-${cid}-${t.dataset.tab}`); });
+    $$('.pane', el).forEach((p) => { p.id = `pane-${cid}-${p.dataset.pane}`; p.setAttribute('role', 'tabpanel'); p.setAttribute('aria-labelledby', `tab-${cid}-${p.dataset.pane}`); });
+    const selectTab = (t) => { $$('.tab', el).forEach((x) => { const on = x === t; x.classList.toggle('active', on); x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; }); $$('.pane', el).forEach((p) => { p.hidden = p.dataset.pane !== t.dataset.tab; }); };
+    $$('.tab', el).forEach((t) => { t.addEventListener('click', () => selectTab(t)); });
+    $('.tabs', el).addEventListener('keydown', (e) => {
+      const tabs = $$('.tab', el); const i = tabs.indexOf(document.activeElement); if (i < 0) return;
+      const n = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+      if (n >= 0) { e.preventDefault(); tabs[n].focus(); selectTab(tabs[n]); }
+    });
+    selectTab($('.tab', el));
+    $('.contact-pick', el).setAttribute('aria-label', `Send to (${o.company})`);
+    $('.d-note', el).addEventListener('input', () => countNote(el));
 
     renderOutreach(o, el);
     return el;
   }
+
+  function countNote(el) { const note = $('.d-note', el); const n = note.value.length; const c = $('.note-count', el); c.textContent = `${n}/300`; c.classList.toggle('over', n > 300); }
 
   function renderOutreach(o, el) {
     const s = state(o.id);
     const contacts = o.contacts || [];
     const pick = $('.contact-pick', el);
     const opts = contacts.map((c, i) => `<option value="${i}">${esc(c.name)} — ${esc(c.title)}</option>`);
-    if (o.careers_email) opts.push(`<option value="careers">Careers inbox — ${esc(o.careers_email)}</option>`);
+    if (isEmail(o.careers_email)) opts.push(`<option value="careers">Careers inbox — ${esc(o.careers_email)}</option>`);
     if (!opts.length) opts.push('<option value="none">No contact — fill in the address yourself</option>');
     pick.innerHTML = opts.join('');
-    const cur = s.contact === 'careers' && o.careers_email ? 'careers' : (typeof s.contact === 'number' && contacts[s.contact] ? String(s.contact) : (contacts.length ? '0' : (o.careers_email ? 'careers' : 'none')));
+    const cur = s.contact === 'careers' && isEmail(o.careers_email) ? 'careers' : (typeof s.contact === 'number' && contacts[s.contact] ? String(s.contact) : (contacts.length ? '0' : (isEmail(o.careers_email) ? 'careers' : 'none')));
     pick.value = cur;
 
+    const key = () => pick.value;
     const current = () => (pick.value === 'careers' || pick.value === 'none') ? null : contacts[Number(pick.value)];
     const recipient = () => pick.value === 'careers' ? { email: o.careers_email, status: 'careers' } : (pick.value === 'none' ? { email: '', status: 'none' } : contactEmail(o, current()));
 
     const subj = $('.d-subject', el), body = $('.d-email', el), note = $('.d-note', el), inmail = $('.d-inmail', el), notes = $('.notes', el);
     const toLine = $('.to-line', el);
+    const fields = { email_subject: subj, email_body: body, linkedin_note: note, linkedin_inmail: inmail };
 
     function refreshToLine() {
       const r = recipient(); const c = current();
       const who = c ? `<b>${esc(c.name)}</b> · ${esc(c.title)}` : (pick.value === 'careers' ? '<b>Careers inbox</b>' : '<b>No recipient selected</b>');
-      const em = r.email ? `${esc(r.email)} <span class="tag ${r.status === 'verified_public' || r.status === 'careers' ? 'tag-ok' : r.status === 'pattern_guess' ? 'tag-guess' : ''}">${r.status === 'verified_public' ? 'published' : r.status === 'careers' ? 'careers inbox' : r.status === 'pattern_guess' ? 'guess — verify first' : r.status}</span>` : '<span class="tag tag-warn">no email — the mail button opens a blank “to”</span>';
+      const label = { verified_public: 'published', careers: 'careers inbox', pattern_guess: 'guess — verify first', unknown: 'unlabelled — verify first' }[r.status] || esc(r.status);
+      const cls = r.status === 'verified_public' || r.status === 'careers' ? 'tag-ok' : r.status === 'pattern_guess' || r.status === 'unknown' ? 'tag-guess' : '';
+      const em = r.email ? `${esc(r.email)} <span class="tag ${cls}">${label}</span>` : '<span class="tag tag-warn">no email — the mail button opens a blank “to”</span>';
       toLine.innerHTML = `${who}<br>${em}`;
     }
     function loadDrafts() {
-      const c = current();
-      subj.value = fill(draft(o, 'email_subject'), o, c);
-      body.value = fill(draft(o, 'email_body'), o, c);
-      note.value = fill(draft(o, 'linkedin_note'), o, c);
-      inmail.value = fill(draft(o, 'linkedin_inmail'), o, c);
+      const c = current(); const k = key(); let anyEdited = false;
+      Object.entries(fields).forEach(([f, input]) => { const d = draft(o, k, f); input.value = d.edited ? d.text : fill(d.text, o, c); anyEdited = anyEdited || d.edited; });
       notes.value = s.notes || '';
-      countNote();
-      refreshToLine();
+      $$('.act-reset', el).forEach((b) => { b.hidden = !anyEdited; });
+      countNote(el); refreshToLine();
     }
-    function countNote() { const n = note.value.length; const c = $('.note-count', el); c.textContent = `${n}/300`; c.classList.toggle('over', n > 300); }
 
     pick.onchange = () => { s.contact = pick.value === 'careers' ? 'careers' : (pick.value === 'none' ? 0 : Number(pick.value)); persist(); loadDrafts(); };
 
-    // Editing a draft stores the edited text (with placeholders already filled) for this opportunity.
-    const bindEdit = (input, field) => { input.oninput = () => { s.drafts = s.drafts || {}; s.drafts[field] = input.value; if (field === 'linkedin_note') countNote(); persist(); }; };
-    bindEdit(subj, 'email_subject'); bindEdit(body, 'email_body'); bindEdit(note, 'linkedin_note'); bindEdit(inmail, 'linkedin_inmail');
+    // Editing a draft stores the edited text for this opportunity + recipient only.
+    Object.entries(fields).forEach(([f, input]) => { input.oninput = () => { const k = key(); s.drafts[k] = s.drafts[k] || {}; s.drafts[k][f] = input.value; persist(); $$('.act-reset', el).forEach((b) => { b.hidden = false; }); }; });
     notes.oninput = () => { s.notes = notes.value; persist(); };
 
-    $$('.act-reset', el).forEach((b) => { b.onclick = () => { const f = b.dataset.field; s.drafts = s.drafts || {}; if (f === 'email') { delete s.drafts.email_subject; delete s.drafts.email_body; } else if (f === 'note') delete s.drafts.linkedin_note; else delete s.drafts.linkedin_inmail; persist(); loadDrafts(); toast('Draft reset'); }; });
+    $$('.act-reset', el).forEach((b) => { b.onclick = () => { const f = b.dataset.field; const k = key(); const d = s.drafts[k] || {}; if (f === 'email') { delete d.email_subject; delete d.email_body; } else if (f === 'note') delete d.linkedin_note; else delete d.linkedin_inmail; if (!Object.keys(d).length) delete s.drafts[k]; persist(); loadDrafts(); toast('Draft reset'); }; });
 
-    $$('.tab', el).forEach((t) => { t.onclick = () => { $$('.tab', el).forEach((x) => x.classList.toggle('active', x === t)); $$('.pane', el).forEach((p) => { p.hidden = p.dataset.pane !== t.dataset.tab; }); }; });
-
-    const markContacted = (via) => { if (s.status === 'new' || s.status === 'shortlisted') { s.status = 'contacted'; el.dataset.status = 'contacted'; $('.status', el).value = 'contacted'; } if (!s.contacted_at) s.contacted_at = nowIso(); s.contacted_via = via; persist(); renderContactedLine(o, el); };
+    const markContacted = (via) => { if (s.status === 'new' || s.status === 'shortlisted') { s.status = 'contacted'; el.dataset.status = 'contacted'; $('.status', el).value = 'contacted'; } if (!s.contacted_at) s.contacted_at = nowIso(); if (!s.contacted_via) s.contacted_via = via; persist(); renderStats(); renderContactedLine(o, el); };
 
     $('.act-send', el).onclick = () => {
       const r = recipient();
-      const full = body.value + (profile.signature && !body.value.includes(profile.signature) ? `\n\n${profile.signature}` : '');
-      const url = mailLink(r.email, subj.value, full);
+      const url = mailLink(r.email, subj.value, body.value);
       go(url, profile.mail_client !== 'mailto');
       markContacted('email'); toast(r.email ? `Opening email to ${r.email}` : 'Opening email — add the address');
     };
@@ -306,13 +336,12 @@
     $$('.act-linkedin', el).forEach((b) => { b.onclick = async () => {
       const c = current(); const text = b.dataset.kind === 'note' ? note.value : inmail.value;
       const ok = await copyText(text);
-      const url = (c && isHttp(c.linkedin_url)) ? c.linkedin_url : (o.linkedin_people_search_url || `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(o.company)}`);
+      const url = (c && isHttp(c.linkedin_url)) ? c.linkedin_url : peopleSearchUrl(o);
       go(url, true);
       markContacted('linkedin');
       toast(ok ? (c && isHttp(c.linkedin_url) ? `Copied — paste it on ${firstName(c.name)}'s profile` : 'Copied — no profile link, opened people search') : 'Copy failed — opened LinkedIn anyway');
     }; });
 
-    note.addEventListener('input', countNote);
     loadDrafts();
     renderContactedLine(o, el);
   }
@@ -324,33 +353,42 @@
 
   // ---------- profile drawer ----------
   const drawer = $('#drawer'), backdrop = $('#drawer-backdrop'), form = $('#profile-form');
-  function openDrawer() { Object.entries(profile).forEach(([k, v]) => { const f = form.elements[k]; if (f) f.value = v ?? ''; }); drawer.hidden = false; backdrop.hidden = false; $('input[name="name"]', form).focus(); }
-  function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; }
+  let lastFocus = null;
+  const inertTargets = () => ['header.top', 'main', 'footer'].map((sel) => $(sel)).filter(Boolean);
+  function fillForm() { Object.entries(profile).forEach(([k, v]) => { const f = form.elements[k]; if (f) f.value = v ?? ''; }); }
+  function openDrawer() { fillForm(); lastFocus = document.activeElement; drawer.hidden = false; backdrop.hidden = false; inertTargets().forEach((n) => { n.inert = true; }); $('input[name="name"]', form).focus(); }
+  function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; inertTargets().forEach((n) => { n.inert = false; }); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
   $('#btn-profile').addEventListener('click', openDrawer);
   $('#btn-drawer-close').addEventListener('click', closeDrawer);
   backdrop.addEventListener('click', closeDrawer);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden) closeDrawer(); });
-  form.addEventListener('submit', (e) => { e.preventDefault(); const fd = new FormData(form); profile = Object.assign({}, DEFAULT_PROFILE, Object.fromEntries(fd.entries())); save(KEYS.profile, profile); closeDrawer(); renderList(); toast('Profile saved — drafts updated'); });
-  $('#btn-profile-reset').addEventListener('click', () => { profile = Object.assign({}, DEFAULT_PROFILE); save(KEYS.profile, {}); openDrawer(); renderList(); toast('Profile reset'); });
+  drawer.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const f = $$('button, [href], input, select, textarea, label.file-btn', drawer).filter((n) => !n.disabled && n.offsetParent !== null);
+    if (!f.length) return; const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  form.addEventListener('submit', (e) => { e.preventDefault(); const fd = new FormData(form); profile = Object.assign({}, DEFAULT_PROFILE, Object.fromEntries(fd.entries())); save(KEYS.profile, profile); closeDrawer(); renderList(); toast('Profile saved — unedited drafts updated'); });
+  $('#btn-profile-reset').addEventListener('click', () => { profile = Object.assign({}, DEFAULT_PROFILE); save(KEYS.profile, {}); fillForm(); renderList(); toast('Profile reset'); });
 
   $('#btn-backup').addEventListener('click', () => download('opportunity-hunter-tracker.json', JSON.stringify({ tracker, profile, exported_at: nowIso() }, null, 2), 'application/json'));
   $('#file-restore').addEventListener('change', async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { const j = JSON.parse(await f.text()); if (j.tracker) tracker = j.tracker; if (j.profile) profile = Object.assign({}, DEFAULT_PROFILE, j.profile); save(KEYS.tracker, tracker); save(KEYS.profile, profile); renderList(); renderStats(); toast('Tracker restored'); }
+    try { const j = JSON.parse(await f.text()); if (j.tracker && typeof j.tracker === 'object') tracker = plain(j.tracker); if (j.profile) profile = Object.assign({}, DEFAULT_PROFILE, j.profile); save(KEYS.tracker, tracker); save(KEYS.profile, profile); fillForm(); renderList(); renderStats(); toast('Tracker restored'); }
     catch (err) { toast('Could not read that file'); }
     e.target.value = '';
   });
-  $('#btn-wipe').addEventListener('click', () => { if (confirm('Clear all statuses, notes and edited drafts in this browser?')) { tracker = {}; save(KEYS.tracker, tracker); renderList(); renderStats(); toast('Tracker cleared'); } });
+  $('#btn-wipe').addEventListener('click', () => { if (confirm('Clear all statuses, notes and edited drafts in this browser?')) { tracker = plain({}); save(KEYS.tracker, tracker); renderList(); renderStats(); toast('Tracker cleared'); } });
 
   // ---------- export ----------
-  function csvCell(v) { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
+  function csvCell(v) { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
   function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
   $('#btn-export').addEventListener('click', () => {
     const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
     const rows = [head.join(',')];
     visible().forEach((o) => {
       const s = state(o.id); const cs = (o.contacts && o.contacts.length) ? o.contacts : [{}];
-      cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, c.name, c.title, c.role_type, c.verified ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
+      cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, c.name, c.title, c.role_type, c.verified === true ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
     });
     download('opportunity-hunter.csv', rows.join('\n'), 'text/csv'); toast(`Exported ${rows.length - 1} rows`);
   });
@@ -358,9 +396,10 @@
   // ---------- boot ----------
   async function boot() {
     if (!DATA.length && location.protocol !== 'file:') {
-      try { const r = await fetch('data/opportunities.json', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); DATA = j.opportunities || []; META = j.meta || {}; } } catch (e) { /* no data */ }
+      try { const r = await fetch('data/opportunities.json', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); DATA = Array.isArray(j.opportunities) ? j.opportunities : []; META = j.meta || {}; } } catch (e) { /* no data */ }
     }
-    DATA.forEach((o, i) => { if (!o.id) o.id = `${(o.company || 'x').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${i}`; });
+    DATA = DATA.filter((o) => o && typeof o === 'object' && o.company);
+    DATA.forEach((o) => { if (!o.id) o.id = slug(`${o.company} ${o.role_title || ''}`); });
     bindFilters(); renderStats(); renderList();
   }
   boot();

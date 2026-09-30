@@ -4,19 +4,21 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, sep } from 'node:path';
+import { statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const useFixture = process.argv.includes('--fixture');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 
+const rootDir = root.endsWith(sep) ? root : root + sep;
 const server = createServer(async (req, res) => {
-  let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let p; try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch (e) { res.writeHead(400); res.end('bad path'); return; }
   if (p === '/') p = '/index.html';
   if (useFixture && p === '/data/opportunities.js') p = '/scripts/fixture-data.js';
   const file = normalize(join(root, p));
-  if (!file.startsWith(root) || !existsSync(file)) { res.writeHead(404); res.end('nope'); return; }
+  if (!file.startsWith(rootDir) || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); res.end('nope'); return; }
   res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' });
   res.end(await readFile(file));
 });
@@ -43,10 +45,12 @@ const check = (cond, msg) => { if (!cond) fails.push(msg); else console.log('  o
 
 await page.addInitScript(() => { window.__nav = []; window.OH_NAV = (u) => { window.__nav.push(u); }; });
 await page.goto(base, { waitUntil: 'networkidle' });
-const total = await page.evaluate(() => (window.OH_DATA || []).length);
-console.log(`Loaded ${base} with ${total} opportunities`);
-check(total > 0, 'data loaded');
-check((await page.locator('.card').count()) === total, 'one card per opportunity');
+const total = await page.locator('.card').count();
+console.log(`Loaded ${base} with ${total} opportunities rendered`);
+if (!total) { console.error('No opportunities rendered. Build the data (node scripts/build-data.mjs) or run with --fixture.'); await browser.close(); server.close(); process.exit(1); }
+const dataLen = await page.evaluate(() => (window.OH_DATA || []).length);
+check(dataLen === 0 || dataLen === total, 'every opportunity in the data renders a card (low scores included)');
+check((await page.locator('.score.s-low').count()) >= (dataLen ? 1 : 0), 'a low-score card renders with the s-low badge');
 check((await page.locator('#stats .stat').count()) === 5, 'five stat tiles');
 
 // Filters
@@ -72,7 +76,8 @@ check(note.length > 0 && note.length <= 300, `LinkedIn note within 300 chars (${
 // Send email → navigation goes through window.OH_NAV (installed above); check the URL the app builds.
 await card.locator('.act-send').click();
 const nav = await page.evaluate(() => window.__nav);
-check(nav.length === 1 && /^mailto:/.test(nav[0]) && /subject=/.test(nav[0]) && /body=/.test(nav[0]), 'Send email builds a mailto: link with subject and body');
+check(nav.length === 1 && /^(mailto:|https:\/\/mail\.google\.com\/|https:\/\/outlook\.office\.com\/)/.test(nav[0]) && /(subject|su)=/.test(nav[0]) && /body=/.test(nav[0]), 'Send email builds a mail link with subject and body');
+check(!/[\r\n]/.test(nav[0]) && !nav[0].includes('%0A%0D'), 'mail link has no raw line breaks in the URL');
 check((await card.locator('.status').inputValue()) === 'contacted', 'sending marks the opportunity Contacted');
 
 // LinkedIn one-click: copies text and opens the profile
@@ -84,8 +89,18 @@ check(nav2.length === 2 && /linkedin\.com/.test(nav2[1]), 'LinkedIn button opens
 const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
 check(clip === note, 'LinkedIn button copied the note to the clipboard');
 
-// Edited drafts persist across reload
+// Edited drafts are per recipient: editing under one contact must not leak into another recipient's draft
 await card.locator('.tab[data-tab="email"]').click();
+const bodyBefore = await card.locator('.d-email').inputValue();
+await card.locator('.d-email').fill(bodyBefore + ' PS edited');
+const pickOptions = await card.locator('.contact-pick option').count();
+if (pickOptions > 1) {
+  await card.locator('.contact-pick').selectOption({ index: 1 });
+  const bodyOther = await card.locator('.d-email').inputValue();
+  check(!bodyOther.includes('PS edited'), 'switching recipient falls back to the template for that recipient');
+  await card.locator('.contact-pick').selectOption({ index: 0 });
+  check((await card.locator('.d-email').inputValue()).includes('PS edited'), 'switching back restores that recipient\'s edit');
+}
 await card.locator('.d-subject').fill('Edited subject');
 await card.locator('.notes').fill('Spoke on Tuesday');
 await page.reload({ waitUntil: 'networkidle' });
@@ -97,7 +112,12 @@ check((await card2.locator('.status').inputValue()) === 'contacted', 'status sur
 await card2.locator('.act-reset[data-field="email"]').click();
 check((await card2.locator('.d-subject').inputValue()) === subject, 'reset restores the original subject');
 
-// Profile drawer changes drafts
+// Profile drawer: focus moves in, Escape closes and restores focus
+await page.click('#btn-profile');
+check(await page.evaluate(() => document.activeElement && document.activeElement.name === 'name'), 'drawer moves focus to the first field');
+await page.keyboard.press('Escape');
+check(await page.evaluate(() => document.getElementById('drawer').hidden), 'Escape closes the drawer');
+check(await page.evaluate(() => document.activeElement && document.activeElement.id === 'btn-profile'), 'closing restores focus to the opener');
 await page.click('#btn-profile');
 await page.fill('#profile-form input[name="name"]', 'Test Person');
 await page.click('#profile-form button[type="submit"]');
@@ -112,6 +132,10 @@ check(['dark', 'light'].includes(await page.evaluate(() => document.documentElem
 const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-export')]);
 const csv = await (await dl.createReadStream()).toArray().then((b) => Buffer.concat(b).toString());
 check(csv.split('\n').length > 1 && csv.startsWith('company,role,'), 'CSV export has a header and rows');
+check(!/(^|,)[=+\-@]/m.test(csv.split('\n').slice(1).join('\n')), 'CSV cells never start with a formula character');
+// Injection attempt in data must be escaped, not executed
+const xss = await page.evaluate(() => document.querySelector('#xss-canary') !== null);
+check(!xss, 'no injected element from data reached the DOM');
 
 // Mobile viewport: no horizontal scroll
 await page.setViewportSize({ width: 390, height: 800 });

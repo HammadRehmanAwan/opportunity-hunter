@@ -23,6 +23,8 @@ jobs:
           node-version: 20
       - name: Validate data and regenerate data/opportunities.js
         run: node scripts/build-data.mjs
+      - name: Fail if the committed data/opportunities.js is stale
+        run: git diff --exit-code -- data/opportunities.js
       - uses: actions/configure-pages@v5
         with:
           enablement: true

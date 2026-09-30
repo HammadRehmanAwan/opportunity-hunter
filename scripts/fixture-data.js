@@ -9,5 +9,10 @@ window.OH_DATA = [
   { id: "beta-2", company: "Beta Labs", role_title: "Deployed AI Engineer", location: "Remote (EMEA)", region: "Remote", remote_policy: "remote", job_url: "https://example.org/jobs/2", score: 6, rationale: "Decent fit.", why_fde: "Customer-embedded.", suggested_contact: "Recruiter",
     contacts: [],
     drafts: { email_subject: "{{role}} at {{company}}", email_body: "Hello,\n\n{{my_name}} here.\n\n{{signature}}", linkedin_note: "Hi — keen on {{company}}.", linkedin_inmail: "Hi,\n\nMessage.\n\n{{my_name}}" },
-    verification: { job_url_live: false, overall_confidence: "medium", issues: "Posting date not shown" }, sources: [], last_verified: "2026-09-30" }
+    verification: { job_url_live: false, overall_confidence: "medium", issues: "Posting date not shown" }, sources: [], last_verified: "2026-09-30" },
+  { id: "gamma-3", company: "Gamma <img src=x onerror=\"document.body.insertAdjacentHTML('beforeend','<i id=xss-canary></i>')\">", role_title: "=HYPERLINK(\"http://evil\")", location: "Austin, US", region: "US", remote_policy: "onsite", job_url: "javascript:alert(1)", score: 4, rationale: "Low fit.", why_fde: "Onsite US.", suggested_contact: "Recruiter", careers_email: "not-an-email",
+    contacts: [ { name: "Bob <b>Bold</b>", title: "Recruiter", role_type: "recruiter", linkedin_url: "javascript:alert(2)", email: "bob@example.net", email_status: "<img src=x onerror=\"document.body.insertAdjacentHTML('beforeend','<i id=xss-canary></i>')\">", verified: "false", why_them: "Posts roles." } ],
+    linkedin_people_search_url: "javascript:alert(3)",
+    drafts: { email_subject: "{{role}} at {{company}}", email_body: "Hi {{first_name}},\n\n{{my_name}} here.\n\n{{signature}}", linkedin_note: "Hi {{first_name}} — keen on {{company}}.", linkedin_inmail: "Hi,\n\nMessage.\n\n{{my_name}}" },
+    verification: { job_url_live: "false", overall_confidence: "low", issues: "" }, sources: ["javascript:alert(4)"], last_verified: "2026-09-30" }
 ];
