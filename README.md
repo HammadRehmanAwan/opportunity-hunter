@@ -12,6 +12,14 @@ Open `index.html` in a browser, or serve the folder:
 npx serve .          # or: python3 -m http.server 8080
 ```
 
+## Privacy first
+
+`data/opportunities.json` names real people (recruiters, hiring managers, engineers) with their LinkedIn profiles and work email addresses, some of them guessed. Treat it as a private contact list:
+
+- Keep the repository **private**. A public repo, or a public branch of one, exposes the list to anyone.
+- **GitHub Pages and Netlify sites are public by default**, even from a private repo on most plans. To keep the list private, open `index.html` locally, or deploy behind access control (Netlify password protection, Cloudflare Access, Vercel deployment protection).
+- Use the list for individual, relevant outreach only. Remove anyone who asks, and don't share the file.
+
 ## Deploy
 
 This folder is designed to be the **root of its own repository** (`opportunity-hunter`). The deploy configs only take effect there:
