@@ -51,21 +51,45 @@ if (!total) { console.error('No opportunities rendered. Build the data (node scr
 const dataLen = await page.evaluate(() => (window.OH_DATA || []).length);
 check(dataLen === 0 || dataLen === total, 'every opportunity in the data renders a card (low scores included)');
 check((await page.locator('.score.s-low').count()) >= (dataLen ? 1 : 0), 'a low-score card renders with the s-low badge');
-check((await page.locator('#stats .stat').count()) === 5, 'five stat tiles');
+check((await page.locator('#stages .stage').count()) === 7, 'seven progress stages');
+check((await page.locator('#stages .stage[data-stage="new"] .n').innerText()) === String(total), 'every role starts as Not contacted');
+check(await page.locator('.card .details').first().isHidden(), 'cards start collapsed (details hidden)');
+check(await page.locator('.card .composer').first().isHidden(), 'cards start collapsed (composer hidden)');
+check(/Write to|Write a message/.test(await page.locator('.card .btn-write').first().innerText()), 'each card offers a Write button');
+
+// Region chips filter and toggle aria-pressed
+await page.click('#regions .chip[data-region="UK"]');
+const ukCount = await page.locator('.card').count();
+check(ukCount > 0 && ukCount <= total, `London & UK chip filters (${ukCount})`);
+check((await page.getAttribute('#regions .chip[data-region="UK"]', 'aria-pressed')) === 'true', 'active region chip is pressed');
+await page.click('#regions .chip[data-region="any"]');
+check((await page.locator('.card').count()) === total, 'Everywhere chip restores all');
+
+// Details toggle
+const first = page.locator('.card').first();
+await first.locator('.btn-details').click();
+check(await first.locator('.details').isVisible(), 'Details & people opens the details');
+check((await first.locator('.btn-details').getAttribute('aria-expanded')) === 'true', 'details button reports expanded');
+await first.locator('.btn-details').click();
+check(await first.locator('.details').isHidden(), 'Details & people closes again');
 
 // Filters
 await page.fill('#f-q', 'zzzz-no-match');
 check((await page.locator('.card').count()) === 0, 'search filters everything out');
 await page.fill('#f-q', '');
 check((await page.locator('.card').count()) === total, 'clearing search restores all');
+await page.click('#btn-more');
+check(await page.locator('#more-filters').isVisible(), 'More filters opens the extra filters');
 await page.selectOption('#f-status', 'contacted');
 check((await page.locator('.card').count()) === 0, 'no contacted rows at start');
 await page.selectOption('#f-status', 'any');
+await page.click('#btn-more');
 
 // Outreach on the first card
 const card = page.locator('.card').first();
 const company = await card.locator('.company').innerText();
-await card.locator('.outreach summary').click();
+await card.locator('.btn-write').click();
+check(await card.locator('.composer').isVisible(), 'Write button opens the message panel');
 const subject = await card.locator('.d-subject').inputValue();
 const body = await card.locator('.d-email').inputValue();
 check(subject.length > 0 && body.length > 0, `drafts present for ${company}`);
@@ -105,7 +129,7 @@ await card.locator('.d-subject').fill('Edited subject');
 await card.locator('.notes').fill('Spoke on Tuesday');
 await page.reload({ waitUntil: 'networkidle' });
 const card2 = page.locator('.card').first();
-await card2.locator('.outreach summary').click();
+await card2.locator('.btn-write').click();
 check((await card2.locator('.d-subject').inputValue()) === 'Edited subject', 'edited subject survives reload');
 check((await card2.locator('.notes').inputValue()) === 'Spoke on Tuesday', 'notes survive reload');
 check((await card2.locator('.status').inputValue()) === 'contacted', 'status survives reload');
@@ -122,7 +146,7 @@ await page.click('#btn-profile');
 await page.fill('#profile-form input[name="name"]', 'Test Person');
 await page.click('#profile-form button[type="submit"]');
 const card3 = page.locator('.card').first();
-await card3.locator('.outreach summary').click();
+await card3.locator('.btn-write').click();
 const inmail3 = await card3.locator('.d-inmail').inputValue();
 check(/Test Person/.test(inmail3), 'profile name flows into the drafts ({{my_name}})');
 
@@ -143,7 +167,7 @@ await page.reload({ waitUntil: 'networkidle' });
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 if (overflow > 0) { const wide = await page.evaluate(() => Array.from(document.querySelectorAll('body *')).filter((e) => e.getBoundingClientRect().right > document.documentElement.clientWidth + 1).slice(0, 8).map((e) => `${e.tagName.toLowerCase()}${e.className ? '.' + String(e.className).split(' ')[0] : ''}@${Math.round(e.getBoundingClientRect().right)}`)); console.log('  overflowing: ' + wide.join(', ')); }
 check(overflow <= 0, `no horizontal overflow at 390px (delta ${overflow})`);
-await page.locator('.card').first().locator('.outreach summary').click();
+await page.locator('.card').first().locator('.btn-write').click();
 const overflow2 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 check(overflow2 <= 0, `no horizontal overflow at 390px with outreach open (delta ${overflow2})`);
 

@@ -195,6 +195,15 @@ if (stage === 'dossier') {
     if (r.drafts_changed && r.drafts && r.drafts.email_body && r.drafts.linkedin_note) o.drafts = r.drafts;
   }
   if (reconcile.size) console.log(`reconcile: ${reconciled} records changed of ${reconcile.size} reviewed`);
+  // Plain-language layer: reader-facing "why it fits you" and "watch out for", rewritten from the analyst notes.
+  const plainText = new Map();
+  for (const run of readOutputs('plain-')) for (const r of (run.results || [])) plainText.set(r.company, r);
+  for (const o of kept) {
+    const r = plainText.get(o.company); if (!r) continue;
+    if (typeof r.fit_summary === 'string' && r.fit_summary.trim()) o.fit_summary = clean(r.fit_summary);
+    if (Array.isArray(r.watch_outs)) o.watch_outs = r.watch_outs.map(clean).filter(Boolean).slice(0, 3);
+  }
+  if (plainText.size) console.log(`plain language: ${kept.filter((o) => o.fit_summary).length} of ${kept.length} records`);
   // Reviewed manual overrides (exact find/replace on a draft field); fail loudly if an anchor no longer matches.
   let overrides = []; try { overrides = JSON.parse(readFileSync(join(SP, 'overrides.json'), 'utf8')); } catch (err) { overrides = []; }
   for (const ov of overrides) {
@@ -218,6 +227,12 @@ if (stage === 'dossier') {
       if (/\b(passionate|leverage|synergy|excited)\b/i.test(t)) qa.push(`${o.company}.${k}: buzzword`);
       for (const ct of o.contacts) if (ct.name && ct.name.split(' ').length > 1 && t.includes(ct.name)) qa.push(`${o.company}.${k}: hard-coded contact name ${ct.name}`);
     }
+    for (const t of [o.fit_summary || '', ...(o.watch_outs || [])]) {
+      if (/\u2014/.test(t)) qa.push(`${o.company}.plain: em-dash`);
+      if (/\b(req|reqs|JD|ATS|crawler|aggregator|snippet)\b/.test(t) || /\b20\d\d-\d\d-\d\d\b/.test(t)) qa.push(`${o.company}.plain: jargon or ISO date: ${t.slice(0, 60)}`);
+      if (/\b(he|his|him)\b/i.test(t)) qa.push(`${o.company}.plain: third person: ${t.slice(0, 60)}`);
+    }
+    if (o.fit_summary && o.fit_summary.length > 260) qa.push(`${o.company}.plain: fit_summary ${o.fit_summary.length} chars`);
     const words = d.email_body.split(/\s+/).filter(Boolean).length; if (words < 100 || words > 190) qa.push(`${o.company}: email ${words} words`);
     if (!/\{\{\s*signature\s*\}\}\s*$/.test(d.email_body)) qa.push(`${o.company}: email does not end with {{signature}}`);
     if (!/\{\{\s*first_name\s*\}\}/.test(d.email_body)) qa.push(`${o.company}: email greeting lacks {{first_name}}`);

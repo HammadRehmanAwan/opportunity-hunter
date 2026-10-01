@@ -1,16 +1,22 @@
-/* Opportunity Hunter — client-side app. No build step, no server, no tracking.
+/* Opportunity Hunter: client-side app. No build step, no server, no tracking.
    Data comes from data/opportunities.js (generated from data/opportunities.json).
-   Tracker state (status, notes, edited drafts) and your profile live in localStorage. */
+   Progress, notes, edited messages and your details live in localStorage. */
 (() => {
   'use strict';
 
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => Array.from(el.querySelectorAll(sel));
 
-  const KEYS = { tracker: 'oh:tracker:v1', profile: 'oh:profile:v1', theme: 'oh:theme', filters: 'oh:filters:v1' };
-  const STATUS_LABEL = { new: 'New', shortlisted: 'Shortlisted', contacted: 'Contacted', replied: 'Replied', interviewing: 'Interviewing', offer: 'Offer', passed: 'Passed / rejected' };
+  const KEYS = { tracker: 'oh:tracker:v1', profile: 'oh:profile:v1', theme: 'oh:theme', filters: 'oh:filters:v2' };
+  const STAGES = [
+    ['new', 'Not contacted'], ['shortlisted', 'Saved'], ['contacted', 'Contacted'], ['replied', 'Replied'],
+    ['interviewing', 'Interviewing'], ['offer', 'Offer'], ['passed', 'Not interested'],
+  ];
+  const STATUS_LABEL = Object.fromEntries(STAGES);
   const ACTIVE = ['contacted', 'replied', 'interviewing', 'offer'];
   const EMAIL_STATUS = ['verified_public', 'pattern_guess'];
+  const ROLE_LABEL = { hiring_manager: 'Hiring manager', fde_lead: 'Leads the FDE team', recruiter: 'Recruiter', founder: 'Founder or exec', team_member: 'Works on the team' };
+  const DEFAULT_FILTERS = { q: '', region: 'any', remote: 'any', minScore: 1, status: 'any', sort: 'score', emailOnly: false, verifiedOnly: false };
 
   const load = (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode etc. */ } };
@@ -25,20 +31,36 @@
   let META = window.OH_META || {};
   let tracker = plain(load(KEYS.tracker, {}));
   let profile = Object.assign({}, DEFAULT_PROFILE, load(KEYS.profile, {}));
-  let filters = Object.assign({ q: '', region: 'any', remote: 'any', minScore: 1, status: 'any', sort: 'score', emailOnly: false, verifiedOnly: false }, load(KEYS.filters, {}));
+  let filters = Object.assign({}, DEFAULT_FILTERS, load(KEYS.filters, {}));
 
   // ---------- helpers ----------
   const firstName = (n) => (n || '').trim().split(/\s+/)[0] || '';
+  const initials = (n) => (n || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((t) => t[0]).join('').toUpperCase();
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const isHttp = (u) => /^https?:\/\//i.test(u || '');
   const isEmail = (e) => /^[^\s@,;:<>?&"'()[\]\\]+@[^\s@,;:<>?&"'()[\]\\/]+\.[a-z]{2,}$/i.test(e || '');
   const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   const nowIso = () => new Date().toISOString();
   const fmtDate = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); };
+  // Research notes use recruiter shorthand; say it in plain words.
+  const say = (t) => String(t || '')
+    .replace(/\breqs\b/gi, 'roles').replace(/\breq\b/gi, 'role').replace(/\bJDs?\b/g, 'job description')
+    .replace(/\bATS\b/g, 'job board').replace(/\bFDEs\b/g, 'forward-deployed engineers').replace(/\bGTM\b/g, 'go-to-market')
+    .replace(/\s+/g, ' ').trim();
+
+  const ICON = {
+    ext: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>',
+    check: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>',
+    alert: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
+    pin: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+    home: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+    li: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>',
+    pen: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>',
+  };
 
   function toast(msg) {
     const t = $('#toast'); t.classList.add('show'); t.textContent = msg;
-    clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; }, 2600);
+    clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; }, 2800);
   }
 
   async function copyText(text) {
@@ -57,11 +79,17 @@
   }
   function persist() { save(KEYS.tracker, tracker); }
 
-  // Picks the email to use for a contact: their own published address, else a pattern guess, else the careers inbox.
+  // The address to use for a contact: their published work email, else a likely one, else the careers inbox.
   function contactEmail(o, c) {
-    if (c && isEmail(c.email)) return { email: c.email, status: EMAIL_STATUS.includes(c.email_status) ? c.email_status : 'unknown', source: c.email_source_url || '' };
-    if (isEmail(o.careers_email)) return { email: o.careers_email, status: 'careers', source: o.careers_email_source_url || '' };
-    return { email: '', status: 'none', source: '' };
+    if (c && isEmail(c.email)) return { email: c.email, status: EMAIL_STATUS.includes(c.email_status) ? c.email_status : 'unknown' };
+    if (isEmail(o.careers_email)) return { email: o.careers_email, status: 'careers' };
+    return { email: '', status: 'none' };
+  }
+  function emailPill(status) {
+    if (status === 'verified_public') return `<span class="pill pill-ok" title="Seen published by the company or the person">${ICON.check}Public</span>`;
+    if (status === 'careers') return '<span class="pill pill-ok" title="The company\'s published recruiting inbox">Careers inbox</span>';
+    if (status === 'pattern_guess' || status === 'unknown') return `<span class="pill pill-warn" title="Follows the company's usual email format but wasn't seen published">${ICON.alert}Likely, check first</span>`;
+    return '';
   }
 
   function fill(tpl, o, c) {
@@ -78,7 +106,7 @@
     return String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (Object.hasOwn(map, k) ? map[k] : m));
   }
 
-  // Edited drafts are stored per opportunity AND per recipient key, so switching contact falls back to the template.
+  // Edited messages are stored per role AND per recipient, so switching person falls back to the template.
   function draft(o, key, field) {
     const s = state(o.id); const edited = s.drafts[key];
     if (edited && typeof edited[field] === 'string') return { text: edited[field], edited: true };
@@ -91,6 +119,7 @@
     if (profile.mail_client === 'outlook') return `https://outlook.office.com/mail/deeplink/compose?to=${enc(addr)}&subject=${enc(subject)}&body=${enc(body)}`;
     return `mailto:${addr}?subject=${enc(subject)}&body=${enc(body)}`;
   }
+  const sendLabel = () => ({ gmail: 'Open in Gmail', outlook: 'Open in Outlook' }[profile.mail_client] || 'Open in your email app');
 
   // Navigation seam: tests (or a host page) can set window.OH_NAV(url, newTab) to observe navigations.
   const go = (url, newTab) => { if (typeof window.OH_NAV === 'function') return window.OH_NAV(url, newTab); if (newTab) window.open(url, '_blank', 'noopener'); else window.location.href = url; };
@@ -104,33 +133,38 @@
   applyTheme(load(KEYS.theme, null));
   $('#btn-theme').addEventListener('click', () => { const next = effectiveTheme() === 'dark' ? 'light' : 'dark'; applyTheme(next); save(KEYS.theme, next); });
 
-  // ---------- stats ----------
-  function renderStats() {
+  // ---------- summary + progress ----------
+  function renderSummary() {
     const total = DATA.length;
     const uk = DATA.filter((o) => o.region === 'UK').length;
-    const remote = DATA.filter((o) => o.region === 'Remote' || (o.remote_policy || '').toLowerCase() === 'remote').length;
-    const contacts = DATA.reduce((n, o) => n + (o.contacts || []).length, 0);
-    const emails = DATA.reduce((n, o) => n + (o.contacts || []).filter((c) => isEmail(c.email)).length + (isEmail(o.careers_email) ? 1 : 0), 0);
-    const contacted = DATA.filter((o) => ACTIVE.includes(state(o.id).status)).length;
-    $('#stats').innerHTML = [
-      ['Open roles', total, ''], ['UK / London', uk, `+${remote} remote`], ['People to approach', contacts, ''], ['Email addresses', emails, ''], ['Contacted', contacted, `of ${total}`],
-    ].map(([k, v, s]) => `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${esc(v)}${s ? `<small>${esc(s)}</small>` : ''}</div></div>`).join('');
-    $('#foot-meta').textContent = META.generated_at ? `Research run ${fmtDate(META.generated_at)} · ${total} roles · ${contacts} contacts` : `${total} roles · ${contacts} contacts`;
+    const people = DATA.reduce((n, o) => n + (o.contacts || []).length, 0);
+    $('#lead').textContent = total
+      ? `${total} open roles (${uk} in London and the UK), ${people} people hiring for them, and a message already written for each one.`
+      : 'Open roles, the people hiring for them, and a message already written for each one.';
+    const counts = Object.fromEntries(STAGES.map(([k]) => [k, 0]));
+    DATA.forEach((o) => { const st = state(o.id).status; counts[Object.hasOwn(counts, st) ? st : 'new']++; });
+    $('#stages').innerHTML = STAGES.map(([k, label]) => `<button type="button" class="stage${counts[k] ? '' : ' is-zero'}" data-stage="${k}" aria-pressed="${filters.status === k}"><span class="n">${counts[k]}</span><span class="k">${esc(label)}</span></button>`).join('');
+    $$('.stage', $('#stages')).forEach((b) => b.addEventListener('click', () => {
+      filters.status = filters.status === b.dataset.stage ? 'any' : b.dataset.stage;
+      $('#f-status').value = filters.status; saveFilters(); renderSummary(); renderList();
+    }));
+    $('#foot-meta').textContent = META.generated_at ? `Researched ${fmtDate(META.generated_at)} · ${total} roles · ${people} people` : `${total} roles · ${people} people`;
   }
 
   // ---------- filtering ----------
+  const regionMatch = (o) => filters.region === 'any' || o.region === filters.region || (filters.region === 'US' && (o.region === 'US' || o.region === 'Other'));
   function visible() {
     const q = filters.q.trim().toLowerCase();
     const rows = DATA.filter((o) => {
       const s = state(o.id);
-      if (filters.region !== 'any' && o.region !== filters.region) return false;
+      if (!regionMatch(o)) return false;
       if (filters.remote !== 'any' && (o.remote_policy || 'unknown').toLowerCase() !== filters.remote) return false;
       if (o.score != null && o.score < filters.minScore) return false;
       if (filters.status !== 'any' && s.status !== filters.status) return false;
       if (filters.emailOnly && !(isEmail(o.careers_email) || (o.contacts || []).some((c) => isEmail(c.email)))) return false;
       if (filters.verifiedOnly && !(o.contacts || []).some((c) => c.verified === true)) return false;
       if (q) {
-        const hay = [o.company, o.role_title, o.location, o.summary, o.rationale, o.outreach_angle, o.what_they_do, ...(o.contacts || []).map((c) => `${c.name} ${c.title}`)].join(' ').toLowerCase();
+        const hay = [o.company, o.role_title, o.location, o.rationale, o.what_they_do, ...(o.contacts || []).map((c) => `${c.name} ${c.title}`)].join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -143,39 +177,52 @@
     };
     return rows.sort(by[filters.sort] || by.score);
   }
+  const saveFilters = () => save(KEYS.filters, filters);
+  const activeExtraFilters = () => ['remote', 'minScore', 'status', 'emailOnly', 'verifiedOnly'].filter((k) => filters[k] !== DEFAULT_FILTERS[k]).length;
 
   function setFilterInputs() {
     const f = filters;
-    $('#f-q').value = f.q; $('#f-region').value = f.region; $('#f-remote').value = f.remote; $('#f-score').value = f.minScore; $('#f-score-out').value = f.minScore;
+    $('#f-q').value = f.q; $('#f-remote').value = f.remote; $('#f-score').value = f.minScore; $('#f-score-out').value = f.minScore;
     $('#f-status').value = f.status; $('#f-sort').value = f.sort; $('#f-email').checked = f.emailOnly; $('#f-verified').checked = f.verifiedOnly;
+    $$('#regions .chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.region === f.region)));
+    const n = activeExtraFilters(); const more = $('#btn-more');
+    more.lastChild.textContent = n ? `More filters (${n})` : 'More filters';
   }
   function bindFilters() {
     const f = filters; setFilterInputs();
-    const upd = () => { save(KEYS.filters, filters); renderList(); };
-    $('#f-q').addEventListener('input', (e) => { f.q = e.target.value; upd(); });
-    $('#f-region').addEventListener('change', (e) => { f.region = e.target.value; upd(); });
+    const upd = () => { saveFilters(); setFilterInputs(); renderSummary(); renderList(); };
+    $('#f-q').addEventListener('input', (e) => { f.q = e.target.value; saveFilters(); renderList(); });
+    $$('#regions .chip').forEach((c) => c.addEventListener('click', () => { f.region = c.dataset.region; upd(); }));
     $('#f-remote').addEventListener('change', (e) => { f.remote = e.target.value; upd(); });
     $('#f-score').addEventListener('input', (e) => { f.minScore = Number(e.target.value); $('#f-score-out').value = f.minScore; upd(); });
     $('#f-status').addEventListener('change', (e) => { f.status = e.target.value; upd(); });
     $('#f-sort').addEventListener('change', (e) => { f.sort = e.target.value; upd(); });
     $('#f-email').addEventListener('change', (e) => { f.emailOnly = e.target.checked; upd(); });
     $('#f-verified').addEventListener('change', (e) => { f.verifiedOnly = e.target.checked; upd(); });
-    $('#btn-clear').addEventListener('click', () => { Object.assign(filters, { q: '', region: 'any', remote: 'any', minScore: 1, status: 'any', sort: 'score', emailOnly: false, verifiedOnly: false }); setFilterInputs(); upd(); });
+    $('#btn-clear').addEventListener('click', () => { Object.assign(filters, DEFAULT_FILTERS); upd(); });
+    const more = $('#btn-more'), panel = $('#more-filters');
+    if (activeExtraFilters()) { panel.hidden = false; more.setAttribute('aria-expanded', 'true'); }
+    more.addEventListener('click', () => { const open = panel.hidden; panel.hidden = !open; more.setAttribute('aria-expanded', String(open)); });
   }
 
   // ---------- rendering ----------
-  const LI_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>';
-
-  function scoreClass(n) { return n == null ? 's-none' : n >= 8 ? 's-high' : n >= 6 ? 's-mid' : 's-low'; }
-  function peopleSearchUrl(o) { return isHttp(o.linkedin_people_search_url) ? o.linkedin_people_search_url : `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${o.company} forward deployed engineer OR recruiter OR head of engineering`)}`; }
+  const matchLabel = (n) => (n == null ? 'Not scored' : n >= 8 ? 'Great match' : n >= 6 ? 'Good match' : n >= 4 ? 'Worth a look' : 'Long shot');
+  const scoreClass = (n) => (n == null ? 's-none' : n >= 8 ? 's-high' : n >= 6 ? 's-mid' : 's-low');
+  const peopleSearchUrl = (o) => (isHttp(o.linkedin_people_search_url) ? o.linkedin_people_search_url : `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${o.company} forward deployed engineer OR recruiter OR head of engineering`)}`);
+  const jobStatus = (o) => { const v = o.verification || {}; return v.job_status || (v.job_url_live === true ? 'listed_recently' : 'unconfirmed'); };
+  const workLabel = { remote: 'Remote', hybrid: 'Hybrid', onsite: 'In the office' };
 
   function renderList() {
     const rows = visible();
     const list = $('#list');
-    $('#result-line').textContent = `${rows.length} of ${DATA.length} opportunities`;
+    $('#result-line').textContent = rows.length === DATA.length ? `Showing all ${rows.length} roles` : `Showing ${rows.length} of ${DATA.length} roles`;
     list.innerHTML = '';
-    if (!DATA.length) { list.innerHTML = '<div class="empty">No data loaded. Run <code>node scripts/build-data.mjs</code> to generate <code>data/opportunities.js</code>.</div>'; return; }
-    if (!rows.length) { list.innerHTML = '<div class="empty">Nothing matches these filters.</div>'; return; }
+    if (!DATA.length) { list.innerHTML = '<div class="empty">No roles loaded yet. Run <code>node scripts/build-data.mjs</code> to build <code>data/opportunities.js</code>.</div>'; return; }
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty">No roles match these filters. <button type="button" class="btn btn-ghost btn-sm" id="empty-reset">Reset filters</button></div>';
+      $('#empty-reset').addEventListener('click', () => $('#btn-clear').click());
+      return;
+    }
     const tpl = $('#tpl-card');
     const frag = document.createDocumentFragment();
     rows.forEach((o) => frag.appendChild(renderCard(o, tpl)));
@@ -187,169 +234,185 @@
     const el = tpl.content.firstElementChild.cloneNode(true);
     el.dataset.id = o.id; el.dataset.status = s.status;
     const cid = slug(o.id);
+    const contacts = o.contacts || [];
     const titleEl = $('.company', el); titleEl.id = `co-${cid}`; el.setAttribute('aria-labelledby', titleEl.id);
 
-    $('.score', el).classList.add(scoreClass(o.score)); $('.score-n', el).textContent = o.score ?? '–';
+    // summary
+    const sc = $('.score', el); sc.classList.add(scoreClass(o.score));
+    $('.score-n', el).textContent = o.score ?? '–';
+    $('.score-label', el).textContent = matchLabel(o.score);
+    sc.setAttribute('aria-label', `${matchLabel(o.score)}, ${o.score ?? 'no'} out of 10`);
     titleEl.innerHTML = isHttp(o.company_url) ? `<a href="${esc(o.company_url)}" target="_blank" rel="noopener">${esc(o.company)}</a>` : esc(o.company);
     $('.role', el).textContent = o.role_title || '';
-    const short = (t, n) => (t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : t);
-    const seenText = o.posted_or_seen ? short(/^(seen|posted|listed|updated)\b/i.test(o.posted_or_seen) ? o.posted_or_seen : `seen ${o.posted_or_seen}`, 48) : '';
-    $('.meta', el).innerHTML = [o.location, o.remote_policy && o.remote_policy !== 'unknown' ? o.remote_policy : '', o.employment_type, o.salary_text ? short(o.salary_text, 40) : '', seenText]
-      .filter(Boolean).map((t) => `<span>${esc(t)}</span>`).join('');
-    if (o.posted_or_seen) $('.meta', el).title = o.posted_or_seen;
+
+    const js = jobStatus(o);
+    const chips = [];
+    if (o.location) chips.push(`<span class="pill">${ICON.pin}${esc(o.location.length > 42 ? `${o.location.slice(0, 40).replace(/\s+\S*$/, '')}…` : o.location)}</span>`);
+    if (workLabel[o.remote_policy]) chips.push(`<span class="pill">${ICON.home}${workLabel[o.remote_policy]}</span>`);
+    chips.push({
+      live_fetched: `<span class="pill pill-ok" title="The job page was open when checked">${ICON.check}Job is open</span>`,
+      listed_recently: `<span class="pill pill-ok" title="Seen listed in the last few weeks">${ICON.check}Seen recently</span>`,
+      closed: `<span class="pill pill-bad">${ICON.alert}May be closed</span>`,
+    }[js] || `<span class="pill pill-warn" title="Not seen in the last few weeks. Open the job link before applying.">${ICON.alert}Check it's still open</span>`);
+    $('.chips', el).innerHTML = chips.join('');
+    $('.why-fit', el).textContent = o.fit_summary || say(o.rationale || o.summary || '');
 
     const job = $('.job-link', el);
-    if (isHttp(o.job_url)) job.href = o.job_url; else job.replaceWith(Object.assign(document.createElement('span'), { className: 'tag tag-warn', textContent: 'No live link' }));
+    if (isHttp(o.job_url)) job.href = o.job_url;
+    else job.replaceWith(Object.assign(document.createElement('span'), { className: 'pill pill-warn', textContent: 'No job link' }));
 
-    const st = $('.status', el); st.value = s.status; st.setAttribute('aria-label', `Status for ${o.company}`);
+    const st = $('.status', el); st.value = s.status; st.setAttribute('aria-label', `Progress for ${o.company}`);
     st.addEventListener('change', () => {
       s.status = st.value; el.dataset.status = s.status;
       if (ACTIVE.includes(s.status) && !s.contacted_at) s.contacted_at = nowIso();
-      persist(); renderStats(); renderContactedLine(o, el); toast(`${o.company}: ${STATUS_LABEL[s.status]}`);
+      persist(); renderSummary(); renderContactedLine(o, el); toast(`${o.company}: ${STATUS_LABEL[s.status]}`);
     });
 
-    $('.rationale', el).textContent = o.rationale || o.summary || '';
-    $('.why-fde', el).textContent = o.why_fde || '';
-    $('.suggested', el).textContent = o.suggested_contact || '';
-    $('.angle', el).textContent = o.outreach_angle || '';
-    $('.team', el).textContent = o.fde_team_context || '';
-    $('.about', el).textContent = [o.what_they_do, o.hq, o.size_text].filter(Boolean).join(' · ');
-    $('.caveats', el).textContent = o.fit_notes || '';
+    const best = contacts[0];
+    $('.best-contact', el).innerHTML = best
+      ? `Best first contact: <b>${esc(best.name)}</b>${best.title ? `, ${esc(best.title)}` : ''}${best.verified === true ? ` <span class="pill pill-ok">${ICON.check}Confirmed</span>` : ''}`
+      : (isEmail(o.careers_email) ? `No named contact yet. Write to the careers inbox, <b>${esc(o.careers_email)}</b>.` : 'No named contact yet. Use the LinkedIn search in the details.');
+
+    // details
+    $('.rationale', el).textContent = o.fit_summary || say(o.rationale || '');
+    const watch = Array.isArray(o.watch_outs) && o.watch_outs.length ? o.watch_outs : (o.fit_notes ? [say(o.fit_notes)] : []);
+    if (watch.length) $('.caveats', el).innerHTML = watch.map((w) => `<li>${esc(w)}</li>`).join('');
+    else $('.watch', el).remove();
+    $('.raw', el).textContent = [o.rationale, o.fit_notes].filter(Boolean).join(' ');
+    $('.team', el).textContent = say(o.fde_team_context || o.why_fde || '');
+    $('.about', el).textContent = [o.what_they_do, o.hq, o.size_text].filter(Boolean).map(say).join(' ');
     const others = (o.other_roles || []).filter((r) => r && r.role_title);
-    $('.also-open', el).innerHTML = others.map((r) => isHttp(r.job_url) ? `<a href="${esc(r.job_url)}" target="_blank" rel="noopener">${esc(r.role_title)}${r.location ? ` (${esc(r.location)})` : ''} ↗</a>` : `${esc(r.role_title)}${r.location ? ` (${esc(r.location)})` : ''}`).join(' · ');
-    $$('.kv div', el).forEach((d) => { if (!$('dd', d).textContent.trim()) d.remove(); });
+    if (others.length) $('.also-open', el).innerHTML = others.map((r) => `<li>${isHttp(r.job_url) ? `<a href="${esc(r.job_url)}" target="_blank" rel="noopener">${esc(r.role_title)}</a>` : esc(r.role_title)}${r.location ? ` <span class="fine">· ${esc(r.location)}</span>` : ''}</li>`).join('');
+    else $('.also', el).remove();
+    $$('.fit h3', el).forEach((h) => { const p = h.nextElementSibling; if (p && p.tagName === 'P' && !p.textContent.trim()) { h.remove(); p.remove(); } });
+    const v = o.verification || {};
+    const srcs = (o.sources || []).filter(isHttp).slice(0, 2).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">source ${i + 1}</a>`).join(' · ');
+    $('.job-note', el).innerHTML = [v.issues ? `Research note: ${esc(say(v.issues))}` : '', o.last_verified ? `Checked ${esc(fmtDate(o.last_verified))}` : '', srcs].filter(Boolean).join(' · ');
 
-    const tags = [];
-    if (o.region) tags.push(['tag-accent', o.region]);
-    if (o.company_type) tags.push(['', o.company_type]);
-    (o.tags || []).forEach((t) => tags.push(['', t]));
-    if (o.verification) {
-      const v = o.verification;
-      const js = v.job_status || (v.job_url_live === true ? 'listed_recently' : 'unconfirmed');
-      tags.push({ live_fetched: ['tag-ok', 'job page checked live'], listed_recently: ['tag-ok', 'listing seen recently'], unconfirmed: ['tag-warn', 'listing unconfirmed'], closed: ['tag-bad', 'posting may be closed'] }[js] || ['tag-warn', 'listing unconfirmed']);
-      if (v.checked === false) tags.push(['tag-warn', 'not re-checked']);
-      else if (v.overall_confidence) tags.push([v.overall_confidence === 'high' ? 'tag-ok' : v.overall_confidence === 'low' ? 'tag-bad' : 'tag-warn', `${v.overall_confidence} confidence`]);
-    }
-    if (o.email_pattern) tags.push(['tag-wrap', `pattern ${o.email_pattern}${o.email_pattern_confidence ? ` (${o.email_pattern_confidence})` : ''}`]);
-    $('.tags', el).innerHTML = tags.map(([c, t]) => `<span class="tag ${c}">${esc(t)}</span>`).join('');
-
-    const vl = $('.verify-line', el);
-    const src = (o.sources || []).filter(isHttp).slice(0, 3).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">source ${i + 1}</a>`).join(' · ');
-    vl.innerHTML = [o.last_verified ? `verified ${esc(o.last_verified)}` : '', o.verification && o.verification.issues ? esc(o.verification.issues) : '', src].filter(Boolean).join(' · ');
-    if (!vl.innerHTML) vl.remove();
-
-    // contacts
     const ul = $('.contacts', el);
-    const contacts = o.contacts || [];
-    if (!contacts.length) ul.innerHTML = '<li class="fine">No named contact confirmed yet — use the people search below or the careers inbox.</li>';
+    if (!contacts.length) ul.innerHTML = '<li class="fine">No named person found yet. Try the LinkedIn search below.</li>';
     contacts.forEach((c, i) => {
-      const li = document.createElement('li'); li.className = 'contact';
-      const em = contactEmail(o, c);
-      const emailHtml = isEmail(c.email)
-        ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a> <span class="tag ${c.email_status === 'verified_public' ? 'tag-ok' : 'tag-guess'}">${c.email_status === 'verified_public' ? 'published' : 'guess'}</span>${isHttp(c.email_source_url) ? ` <a class="fine" href="${esc(c.email_source_url)}" target="_blank" rel="noopener">src</a>` : ''}`
-        : (em.email ? `<span class="fine">no personal email · use ${esc(em.email)}</span>` : '<span class="fine">no email found</span>');
+      const li = document.createElement('li'); li.className = `contact${i === 0 ? ' is-best' : ''}`;
+      const em = isEmail(c.email) ? { email: c.email, status: EMAIL_STATUS.includes(c.email_status) ? c.email_status : 'unknown' } : null;
       li.innerHTML = `
+        <div class="avatar" aria-hidden="true">${esc(initials(c.name))}</div>
         <div class="who">
-          <div class="name">${esc(c.name)} ${c.verified === true ? '<span class="verified" title="Title and profile re-checked">✓ verified</span>' : '<span class="unverified" title="Could not be independently re-checked">unverified</span>'}</div>
-          <div class="title">${esc(c.title)}${c.role_type ? ` · <span class="tag">${esc(String(c.role_type).replace(/_/g, ' '))}</span>` : ''}</div>
-          ${c.why_them ? `<div class="why">${esc(c.why_them)}</div>` : ''}
-          <div class="email">${emailHtml}</div>
+          <div class="name">${esc(c.name)}${c.verified === true ? ` <span class="pill pill-ok" title="Search results show them at this company in this job">${ICON.check}Confirmed</span>` : ' <span class="pill" title="We could not check this, which does not mean it is wrong">Not confirmed</span>'}${i === 0 ? ' <span class="pill pill-accent">Start here</span>' : ''}</div>
+          <div class="title">${esc(c.title)}${ROLE_LABEL[c.role_type] ? ` · ${ROLE_LABEL[c.role_type]}` : ''}</div>
+          ${em ? `<div class="email"><a href="mailto:${esc(em.email)}">${esc(em.email)}</a>${emailPill(em.status)}</div>` : ''}
+          ${c.why_them ? `<details><summary>Why contact them</summary><p>${esc(say(c.why_them))}</p></details>` : ''}
         </div>
-        <div class="links">
-          ${isHttp(c.linkedin_url) ? `<a class="li-btn" href="${esc(c.linkedin_url)}" target="_blank" rel="noopener">${LI_ICON}LinkedIn</a>` : '<span class="fine">no profile link</span>'}
-          ${isHttp(c.evidence_url) ? `<a class="fine" href="${esc(c.evidence_url)}" target="_blank" rel="noopener">evidence ↗</a>` : ''}
-          <button type="button" class="btn btn-ghost btn-sm act-pick" data-i="${i}" aria-label="Draft outreach to ${esc(c.name)} at ${esc(o.company)}">Draft to ${esc(firstName(c.name))}</button>
+        <div class="contact-actions">
+          <button type="button" class="btn ${i === 0 ? 'btn-primary' : 'btn-ghost'} btn-sm act-pick" data-i="${i}" aria-label="Write to ${esc(c.name)} at ${esc(o.company)}">${ICON.pen}Write to ${esc(firstName(c.name))}</button>
+          ${isHttp(c.linkedin_url) ? `<a class="btn btn-ghost btn-sm li-btn" href="${esc(c.linkedin_url)}" target="_blank" rel="noopener" aria-label="${esc(c.name)} on LinkedIn">${ICON.li}LinkedIn</a>` : ''}
+          ${isHttp(c.evidence_url) && c.evidence_url !== c.linkedin_url ? `<a class="btn btn-link btn-sm" href="${esc(c.evidence_url)}" target="_blank" rel="noopener">Where we found them</a>` : ''}
         </div>`;
       ul.appendChild(li);
     });
+    $('.people-search', el).innerHTML = [
+      `<a href="${esc(peopleSearchUrl(o))}" target="_blank" rel="noopener">Find more people on LinkedIn</a>`,
+      isHttp(o.linkedin_company_url) ? `<a href="${esc(o.linkedin_company_url)}" target="_blank" rel="noopener">Company on LinkedIn</a>` : '',
+      isHttp(o.careers_url) ? `<a href="${esc(o.careers_url)}" target="_blank" rel="noopener">Careers page</a>` : '',
+      isEmail(o.careers_email) ? `Careers inbox: <a href="mailto:${esc(o.careers_email)}">${esc(o.careers_email)}</a>` : '',
+    ].filter(Boolean).join(' · ');
+
+    // open / close panels
+    const details = $('.details', el), composer = $('.composer', el);
+    const btnDetails = $('.btn-details', el), btnWrite = $('.btn-write', el);
+    const syncOpen = () => el.classList.toggle('is-open', !details.hidden || !composer.hidden);
+    const toggleDetails = (open = details.hidden) => { details.hidden = !open; btnDetails.setAttribute('aria-expanded', String(open)); syncOpen(); };
+    const openComposer = (focus) => {
+      composer.hidden = false; btnWrite.setAttribute('aria-expanded', 'true'); syncOpen();
+      composer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (focus) $('.contact-pick', el).focus({ preventScroll: true });
+    };
+    const closeComposer = () => { composer.hidden = true; btnWrite.setAttribute('aria-expanded', 'false'); syncOpen(); btnWrite.focus({ preventScroll: true }); };
+    btnDetails.addEventListener('click', () => toggleDetails());
+    btnWrite.addEventListener('click', () => (composer.hidden ? openComposer(true) : closeComposer()));
+    $('.btn-close-composer', el).addEventListener('click', closeComposer);
     $$('.act-pick', el).forEach((b) => b.addEventListener('click', () => {
-      s.contact = Number(b.dataset.i); persist(); renderOutreach(o, el);
-      const det = $('.outreach', el); det.open = true; det.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      $('.contact-pick', el).focus({ preventScroll: true }); toast(`Drafts switched to ${contacts[s.contact].name}`);
+      s.contact = Number(b.dataset.i); persist(); renderComposer(o, el); openComposer(true);
+      toast(`Writing to ${contacts[s.contact].name}`);
     }));
 
-    const ps = $('.people-search', el);
-    ps.innerHTML = `Find more: <a href="${esc(peopleSearchUrl(o))}" target="_blank" rel="noopener">LinkedIn people search ↗</a>${isHttp(o.linkedin_company_url) ? ` · <a href="${esc(o.linkedin_company_url)}" target="_blank" rel="noopener">company page ↗</a>` : ''}${isHttp(o.careers_url) ? ` · <a href="${esc(o.careers_url)}" target="_blank" rel="noopener">careers ↗</a>` : ''}${isEmail(o.careers_email) ? ` · careers inbox <a href="mailto:${esc(o.careers_email)}">${esc(o.careers_email)}</a>` : ''}`;
-
-    // tabs: ids + aria wiring (once per card)
+    // tabs (ids + aria, once per card)
     $$('.tab', el).forEach((t) => { t.id = `tab-${cid}-${t.dataset.tab}`; t.setAttribute('aria-controls', `pane-${cid}-${t.dataset.tab}`); });
     $$('.pane', el).forEach((p) => { p.id = `pane-${cid}-${p.dataset.pane}`; p.setAttribute('role', 'tabpanel'); p.setAttribute('aria-labelledby', `tab-${cid}-${p.dataset.pane}`); });
     const selectTab = (t) => { $$('.tab', el).forEach((x) => { const on = x === t; x.classList.toggle('active', on); x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; }); $$('.pane', el).forEach((p) => { p.hidden = p.dataset.pane !== t.dataset.tab; }); };
-    $$('.tab', el).forEach((t) => { t.addEventListener('click', () => selectTab(t)); });
+    $$('.tab', el).forEach((t) => t.addEventListener('click', () => selectTab(t)));
     $('.tabs', el).addEventListener('keydown', (e) => {
       const tabs = $$('.tab', el); const i = tabs.indexOf(document.activeElement); if (i < 0) return;
       const n = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
       if (n >= 0) { e.preventDefault(); tabs[n].focus(); selectTab(tabs[n]); }
     });
     selectTab($('.tab', el));
-    $('.contact-pick', el).setAttribute('aria-label', `Send to (${o.company})`);
+    $('.contact-pick', el).setAttribute('aria-label', `Who to send it to at ${o.company}`);
     $('.d-note', el).addEventListener('input', () => countNote(el));
 
-    renderOutreach(o, el);
+    renderComposer(o, el);
     return el;
   }
 
-  function countNote(el) { const note = $('.d-note', el); const n = note.value.length; const c = $('.note-count', el); c.textContent = `${n}/300`; c.classList.toggle('over', n > 300); }
+  function countNote(el) { const n = $('.d-note', el).value.length; const c = $('.note-count', el); c.textContent = `${n} of 300 characters`; c.classList.toggle('over', n > 300); }
 
-  function renderOutreach(o, el) {
+  function renderComposer(o, el) {
     const s = state(o.id);
     const contacts = o.contacts || [];
     const pick = $('.contact-pick', el);
-    const opts = contacts.map((c, i) => `<option value="${i}">${esc(c.name)} — ${esc(c.title)}</option>`);
-    if (isEmail(o.careers_email)) opts.push(`<option value="careers">Careers inbox — ${esc(o.careers_email)}</option>`);
-    if (!opts.length) opts.push('<option value="none">No contact — fill in the address yourself</option>');
+    const opts = contacts.map((c, i) => `<option value="${i}">${esc(c.name)}${c.title ? `, ${esc(c.title)}` : ''}</option>`);
+    if (isEmail(o.careers_email)) opts.push(`<option value="careers">Careers inbox (${esc(o.careers_email)})</option>`);
+    if (!opts.length) opts.push('<option value="none">No named contact (add the address yourself)</option>');
     pick.innerHTML = opts.join('');
-    const cur = s.contact === 'careers' && isEmail(o.careers_email) ? 'careers' : (typeof s.contact === 'number' && contacts[s.contact] ? String(s.contact) : (contacts.length ? '0' : (isEmail(o.careers_email) ? 'careers' : 'none')));
-    pick.value = cur;
+    pick.value = s.contact === 'careers' && isEmail(o.careers_email) ? 'careers' : (typeof s.contact === 'number' && contacts[s.contact] ? String(s.contact) : (contacts.length ? '0' : (isEmail(o.careers_email) ? 'careers' : 'none')));
 
     const key = () => pick.value;
     const current = () => (pick.value === 'careers' || pick.value === 'none') ? null : contacts[Number(pick.value)];
     const recipient = () => pick.value === 'careers' ? { email: o.careers_email, status: 'careers' } : (pick.value === 'none' ? { email: '', status: 'none' } : contactEmail(o, current()));
 
     const subj = $('.d-subject', el), body = $('.d-email', el), note = $('.d-note', el), inmail = $('.d-inmail', el), notes = $('.notes', el);
-    const toLine = $('.to-line', el);
     const fields = { email_subject: subj, email_body: body, linkedin_note: note, linkedin_inmail: inmail };
+    const label = $('.write-label', el);
 
-    function refreshToLine() {
+    function refresh() {
       const r = recipient(); const c = current();
-      const who = c ? `<b>${esc(c.name)}</b> · ${esc(c.title)}` : (pick.value === 'careers' ? '<b>Careers inbox</b>' : '<b>No recipient selected</b>');
-      const label = { verified_public: 'published', careers: 'careers inbox', pattern_guess: 'guess — verify first', unknown: 'unlabelled — verify first' }[r.status] || esc(r.status);
-      const cls = r.status === 'verified_public' || r.status === 'careers' ? 'tag-ok' : r.status === 'pattern_guess' || r.status === 'unknown' ? 'tag-guess' : '';
-      const em = r.email ? `${esc(r.email)} <span class="tag ${cls}">${label}</span>` : '<span class="tag tag-warn">no email — the mail button opens a blank “to”</span>';
-      toLine.innerHTML = `${who}<br>${em}`;
+      const who = c ? `<span class="to-who"><b>${esc(c.name)}</b>${c.title ? `, ${esc(c.title)}` : ''}</span>` : `<span class="to-who"><b>${pick.value === 'careers' ? 'Careers inbox' : 'Nobody picked'}</b></span>`;
+      const em = r.email ? `<span class="to-email"><span>${esc(r.email)}</span>${emailPill(r.status)}</span>` : '<span class="to-email"><span class="pill pill-warn">No email address. Use LinkedIn, or type one into your email app.</span></span>';
+      $('.to-line', el).innerHTML = `${who}${em}`;
+      $('.composer-title', el).textContent = c ? `Write to ${c.name}` : (pick.value === 'careers' ? `Write to ${o.company}'s careers inbox` : `Write to ${o.company}`);
+      label.textContent = c ? `Write to ${firstName(c.name)}` : 'Write a message';
+      $('.send-label', el).textContent = sendLabel();
     }
     function loadDrafts() {
       const c = current(); const k = key(); let anyEdited = false;
       Object.entries(fields).forEach(([f, input]) => { const d = draft(o, k, f); input.value = d.edited ? d.text : fill(d.text, o, c); anyEdited = anyEdited || d.edited; });
       notes.value = s.notes || '';
       $$('.act-reset', el).forEach((b) => { b.hidden = !anyEdited; });
-      countNote(el); refreshToLine();
+      countNote(el); refresh();
     }
 
     pick.onchange = () => { s.contact = pick.value === 'careers' ? 'careers' : (pick.value === 'none' ? 0 : Number(pick.value)); persist(); loadDrafts(); };
 
-    // Editing a draft stores the edited text for this opportunity + recipient only.
+    // Editing stores the edited text for this role + this person only.
     Object.entries(fields).forEach(([f, input]) => { input.oninput = () => { const k = key(); s.drafts[k] = s.drafts[k] || {}; s.drafts[k][f] = input.value; persist(); $$('.act-reset', el).forEach((b) => { b.hidden = false; }); }; });
     notes.oninput = () => { s.notes = notes.value; persist(); };
 
-    $$('.act-reset', el).forEach((b) => { b.onclick = () => { const f = b.dataset.field; const k = key(); const d = s.drafts[k] || {}; if (f === 'email') { delete d.email_subject; delete d.email_body; } else if (f === 'note') delete d.linkedin_note; else delete d.linkedin_inmail; if (!Object.keys(d).length) delete s.drafts[k]; persist(); loadDrafts(); toast('Draft reset'); }; });
+    $$('.act-reset', el).forEach((b) => { b.onclick = () => { const f = b.dataset.field; const k = key(); const d = s.drafts[k] || {}; if (f === 'email') { delete d.email_subject; delete d.email_body; } else if (f === 'note') delete d.linkedin_note; else delete d.linkedin_inmail; if (!Object.keys(d).length) delete s.drafts[k]; persist(); loadDrafts(); toast('Back to the original message'); }; });
 
-    const markContacted = (via) => { if (s.status === 'new' || s.status === 'shortlisted') { s.status = 'contacted'; el.dataset.status = 'contacted'; $('.status', el).value = 'contacted'; } if (!s.contacted_at) s.contacted_at = nowIso(); if (!s.contacted_via) s.contacted_via = via; persist(); renderStats(); renderContactedLine(o, el); };
+    const markContacted = (via) => { if (s.status === 'new' || s.status === 'shortlisted') { s.status = 'contacted'; el.dataset.status = 'contacted'; $('.status', el).value = 'contacted'; } if (!s.contacted_at) s.contacted_at = nowIso(); if (!s.contacted_via) s.contacted_via = via; persist(); renderSummary(); renderContactedLine(o, el); };
 
     $('.act-send', el).onclick = () => {
       const r = recipient();
-      const url = mailLink(r.email, subj.value, body.value);
-      go(url, profile.mail_client !== 'mailto');
-      markContacted('email'); toast(r.email ? `Opening email to ${r.email}` : 'Opening email — add the address');
+      go(mailLink(r.email, subj.value, body.value), profile.mail_client !== 'mailto');
+      markContacted('email'); toast(r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.');
     };
-    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); toast(ok ? 'Email copied' : 'Copy failed — select the text manually'); };
+    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); toast(ok ? 'Email copied' : 'Copy failed. Select the text and copy it yourself.'); };
     $$('.act-linkedin', el).forEach((b) => { b.onclick = async () => {
       const c = current(); const text = b.dataset.kind === 'note' ? note.value : inmail.value;
       const ok = await copyText(text);
-      const url = (c && isHttp(c.linkedin_url)) ? c.linkedin_url : peopleSearchUrl(o);
-      go(url, true);
+      const hasProfile = c && isHttp(c.linkedin_url);
+      go(hasProfile ? c.linkedin_url : peopleSearchUrl(o), true);
       markContacted('linkedin');
-      toast(ok ? (c && isHttp(c.linkedin_url) ? `Copied — paste it on ${firstName(c.name)}'s profile` : 'Copied — no profile link, opened people search') : 'Copy failed — opened LinkedIn anyway');
+      toast(ok ? (hasProfile ? `Copied. Paste it on ${firstName(c.name)}'s LinkedIn profile.` : 'Copied. No profile link, so LinkedIn search opened.') : 'Copy failed, but LinkedIn opened.');
     }; });
 
     loadDrafts();
@@ -358,10 +421,10 @@
 
   function renderContactedLine(o, el) {
     const s = state(o.id); const line = $('.contacted-line', el);
-    line.textContent = s.contacted_at ? `Status: ${STATUS_LABEL[s.status]} · first contact ${fmtDate(s.contacted_at)}${s.contacted_via ? ` via ${s.contacted_via}` : ''}` : `Status: ${STATUS_LABEL[s.status] || 'New'}`;
+    line.textContent = s.contacted_at ? `Progress: ${STATUS_LABEL[s.status]} · first contacted ${fmtDate(s.contacted_at)}${s.contacted_via ? ` by ${s.contacted_via === 'linkedin' ? 'LinkedIn' : 'email'}` : ''}` : `Progress: ${STATUS_LABEL[s.status] || 'Not contacted'}`;
   }
 
-  // ---------- profile drawer ----------
+  // ---------- your details drawer ----------
   const drawer = $('#drawer'), backdrop = $('#drawer-backdrop'), form = $('#profile-form');
   let lastFocus = null;
   const inertTargets = () => ['header.top', 'main', 'footer'].map((sel) => $(sel)).filter(Boolean);
@@ -378,30 +441,32 @@
     if (!f.length) return; const first = f[0], last = f[f.length - 1];
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
-  form.addEventListener('submit', (e) => { e.preventDefault(); const fd = new FormData(form); profile = Object.assign({}, DEFAULT_PROFILE, Object.fromEntries(fd.entries())); save(KEYS.profile, profile); closeDrawer(); renderList(); toast('Profile saved — unedited drafts updated'); });
-  $('#btn-profile-reset').addEventListener('click', () => { profile = Object.assign({}, DEFAULT_PROFILE); save(KEYS.profile, {}); fillForm(); renderList(); toast('Profile reset'); });
+  form.addEventListener('submit', (e) => { e.preventDefault(); const fd = new FormData(form); profile = Object.assign({}, DEFAULT_PROFILE, Object.fromEntries(fd.entries())); save(KEYS.profile, profile); closeDrawer(); renderList(); toast('Saved. Messages you haven\'t edited now use these details.'); });
+  $('#btn-profile-reset').addEventListener('click', () => { profile = Object.assign({}, DEFAULT_PROFILE); save(KEYS.profile, {}); fillForm(); renderList(); toast('Back to the default details'); });
 
-  $('#btn-backup').addEventListener('click', () => download('opportunity-hunter-tracker.json', JSON.stringify({ tracker, profile, exported_at: nowIso() }, null, 2), 'application/json'));
+  $('#btn-backup').addEventListener('click', () => download('opportunity-hunter-backup.json', JSON.stringify({ tracker, profile, exported_at: nowIso() }, null, 2), 'application/json'));
   $('#file-restore').addEventListener('change', async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { const j = JSON.parse(await f.text()); if (j.tracker && typeof j.tracker === 'object') tracker = plain(j.tracker); if (j.profile) profile = Object.assign({}, DEFAULT_PROFILE, j.profile); save(KEYS.tracker, tracker); save(KEYS.profile, profile); fillForm(); renderList(); renderStats(); toast('Tracker restored'); }
-    catch (err) { toast('Could not read that file'); }
+    try { const j = JSON.parse(await f.text()); if (j.tracker && typeof j.tracker === 'object') tracker = plain(j.tracker); if (j.profile) profile = Object.assign({}, DEFAULT_PROFILE, j.profile); save(KEYS.tracker, tracker); save(KEYS.profile, profile); fillForm(); renderSummary(); renderList(); toast('Backup restored'); }
+    catch (err) { toast('That file could not be read'); }
     e.target.value = '';
   });
-  $('#btn-wipe').addEventListener('click', () => { if (confirm('Clear all statuses, notes and edited drafts in this browser?')) { tracker = plain({}); save(KEYS.tracker, tracker); renderList(); renderStats(); toast('Tracker cleared'); } });
+  $('#btn-wipe').addEventListener('click', () => { if (confirm('Clear all progress, notes and edited messages in this browser?')) { tracker = plain({}); save(KEYS.tracker, tracker); renderSummary(); renderList(); toast('Cleared'); } });
 
   // ---------- export ----------
   function csvCell(v) { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
   function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
-  $('#btn-export').addEventListener('click', () => {
+  const exportCsv = () => {
     const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
     const rows = [head.join(',')];
     visible().forEach((o) => {
       const s = state(o.id); const cs = (o.contacts && o.contacts.length) ? o.contacts : [{}];
       cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, c.name, c.title, c.role_type, c.verified === true ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
     });
-    download('opportunity-hunter.csv', rows.join('\n'), 'text/csv'); toast(`Exported ${rows.length - 1} rows`);
-  });
+    download('opportunity-hunter.csv', rows.join('\n'), 'text/csv'); toast(`Downloaded ${rows.length - 1} rows`);
+  };
+  $('#btn-export').addEventListener('click', exportCsv);
+  $('#btn-export-2').addEventListener('click', exportCsv);
 
   // ---------- boot ----------
   async function boot() {
@@ -410,7 +475,7 @@
     }
     DATA = DATA.filter((o) => o && typeof o === 'object' && o.company);
     DATA.forEach((o) => { if (!o.id) o.id = slug(`${o.company} ${o.role_title || ''}`); });
-    bindFilters(); renderStats(); renderList();
+    bindFilters(); renderSummary(); renderList();
   }
   boot();
 })();

@@ -4,23 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Opportunity Hunter</title>
-<meta name="description" content="Open Forward Deployed AI Engineer roles, the people to approach at each company, and one-click email and LinkedIn outreach drafts.">
+<meta name="description" content="Open Forward Deployed AI Engineer roles, the people hiring for them, and a ready-to-send message for each.">
 <meta name="color-scheme" content="dark light">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23ff5a1f'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%230e0d0b'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
+<a class="skip" href="#list">Skip to the roles</a>
+
 <header class="top">
   <nav class="wrap">
-    <a class="brand" href="#"><span class="dot" aria-hidden="true"></span>OPPORTUNITY HUNTER<span class="brand-sub">· Forward Deployed AI Engineer</span></a>
+    <a class="brand" href="#"><span class="dot" aria-hidden="true"></span>Opportunity Hunter</a>
     <div class="nav-actions">
-      <button class="btn btn-ghost btn-sm" id="btn-profile" type="button" title="Edit the sender profile used in every draft">Your profile</button>
-      <button class="btn btn-ghost btn-sm" id="btn-export" type="button" title="Download everything as CSV">Export CSV</button>
-      <button class="icon-btn" id="btn-theme" type="button" aria-label="Switch theme" aria-pressed="false" title="Toggle theme">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+      <button class="btn btn-ghost btn-sm" id="btn-profile" type="button" aria-label="Your details">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span class="lbl">Your details</span>
+      </button>
+      <button class="btn btn-ghost btn-sm hide-sm" id="btn-export" type="button">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>Download CSV
+      </button>
+      <button class="icon-btn" id="btn-theme" type="button" aria-label="Switch theme" aria-pressed="false" title="Light / dark">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
       </button>
     </div>
   </nav>
@@ -28,126 +34,145 @@
 
 <main class="wrap">
   <section class="hero">
-    <p class="label"><span class="ln" aria-hidden="true"></span>Scan → Filter → Enrich → Score → Gate → Outreach</p>
-    <h1>Every open <em>Forward Deployed</em> AI Engineer role, the people behind it, and the message to send.</h1>
-    <p class="sum">Built like the client-hunting pipeline: each opportunity is scored 1–10 with a rationale, comes with the hiring manager or recruiter to approach on LinkedIn, a verified or best-guess email, and a drafted email and LinkedIn note you can send with one click. Your approvals, notes and edits stay in this browser.</p>
-    <div class="stats" id="stats"></div>
+    <h1>Forward Deployed AI Engineer roles, <em>ready to apply</em></h1>
+    <p class="lead" id="lead">Open roles, the people hiring for them, and a message already written for each one.</p>
+
+    <ol class="how" aria-label="How it works">
+      <li><span class="how-n">1</span><div><b>Pick a role</b><span>Your best matches are at the top.</span></div></li>
+      <li><span class="how-n">2</span><div><b>Choose who to contact</b><span>Recruiters and hiring managers, with LinkedIn and email.</span></div></li>
+      <li><span class="how-n">3</span><div><b>Send in one click</b><span>Edit the message if you like, then email it or paste it on LinkedIn.</span></div></li>
+    </ol>
   </section>
 
-  <section class="controls" aria-label="Filters">
-    <div class="control search">
-      <label for="f-q">Search</label>
-      <input id="f-q" type="search" placeholder="Company, role, city, person…" autocomplete="off">
+  <section class="progress" aria-label="Your progress">
+    <div class="progress-head"><h2>Your progress</h2><span class="fine">Tap a stage to see those roles</span></div>
+    <div class="stages" id="stages"></div>
+  </section>
+
+  <section class="toolbar" aria-label="Find roles">
+    <div class="search">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="f-q" type="search" placeholder="Search a company, role or person" autocomplete="off" aria-label="Search">
     </div>
-    <div class="control">
-      <label for="f-region">Region</label>
-      <select id="f-region">
-        <option value="any">Anywhere</option>
-        <option value="UK">UK / London</option>
-        <option value="Europe">Europe</option>
-        <option value="Remote">Remote</option>
-        <option value="US">United States</option>
-        <option value="Other">Other</option>
-      </select>
+    <div class="regions" role="group" aria-label="Where" id="regions">
+      <button type="button" class="chip" data-region="any">Everywhere</button>
+      <button type="button" class="chip" data-region="UK">London &amp; UK</button>
+      <button type="button" class="chip" data-region="Remote">Remote</button>
+      <button type="button" class="chip" data-region="Europe">Europe</button>
+      <button type="button" class="chip" data-region="US">US &amp; other</button>
     </div>
-    <div class="control">
-      <label for="f-remote">Work mode</label>
+    <div class="toolbar-end">
+      <label class="sort">Sort
+        <select id="f-sort">
+          <option value="score">Best match first</option>
+          <option value="company">Company A to Z</option>
+          <option value="recent">Recently contacted</option>
+          <option value="contacts">Most people to contact</option>
+        </select>
+      </label>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-more" aria-expanded="false" aria-controls="more-filters">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>More filters
+      </button>
+    </div>
+  </section>
+
+  <section class="more-filters" id="more-filters" hidden aria-label="More filters">
+    <label>Work style
       <select id="f-remote">
         <option value="any">Any</option>
         <option value="remote">Remote</option>
         <option value="hybrid">Hybrid</option>
-        <option value="onsite">On-site</option>
+        <option value="onsite">In the office</option>
       </select>
-    </div>
-    <div class="control">
-      <label for="f-score">Min score <output id="f-score-out">1</output></label>
-      <input id="f-score" type="range" min="1" max="10" step="1" value="1">
-    </div>
-    <div class="control">
-      <label for="f-status">Status</label>
+    </label>
+    <label>Progress
       <select id="f-status">
-        <option value="any">All</option>
-        <option value="new">New</option>
-        <option value="shortlisted">Shortlisted</option>
+        <option value="any">Any</option>
+        <option value="new">Not contacted</option>
+        <option value="shortlisted">Saved</option>
         <option value="contacted">Contacted</option>
         <option value="replied">Replied</option>
         <option value="interviewing">Interviewing</option>
         <option value="offer">Offer</option>
-        <option value="passed">Passed / rejected</option>
+        <option value="passed">Not interested</option>
       </select>
-    </div>
-    <div class="control">
-      <label for="f-sort">Sort</label>
-      <select id="f-sort">
-        <option value="score">Score (high → low)</option>
-        <option value="company">Company (A → Z)</option>
-        <option value="contacts">Most contacts</option>
-        <option value="recent">Recently contacted</option>
-      </select>
-    </div>
-    <div class="control check">
-      <label><input id="f-email" type="checkbox"> Has an email address</label>
-      <label><input id="f-verified" type="checkbox"> Verified contacts only</label>
-    </div>
-    <button class="btn btn-ghost btn-sm" id="btn-clear" type="button">Clear filters</button>
+    </label>
+    <label>Lowest match score: <output id="f-score-out">1</output>
+      <input id="f-score" type="range" min="1" max="10" step="1" value="1">
+    </label>
+    <label class="check"><input id="f-email" type="checkbox"> Only roles with an email address</label>
+    <label class="check"><input id="f-verified" type="checkbox"> Only roles with a confirmed contact</label>
+    <button class="btn btn-ghost btn-sm" id="btn-clear" type="button">Reset filters</button>
   </section>
 
   <p class="result-line" id="result-line" aria-live="polite"></p>
-  <section id="list" class="list" aria-label="Opportunities"></section>
+  <section id="list" class="list" aria-label="Roles" tabindex="-1"></section>
 
-  <section class="method">
-    <h2 class="sh">How this list was built</h2>
-    <ol class="steps">
-      <li><b>Scan.</b> Eight parallel searches over careers pages, Ashby / Greenhouse / Lever boards, LinkedIn Jobs, Otta, Wellfound and Work at a Startup for “forward deployed engineer” and adjacent titles.</li>
-      <li><b>Filter.</b> Only roles visible as open on a live page, de-duplicated by company and role.</li>
-      <li><b>Enrich.</b> Per company: what the forward-deployed team does, the hiring manager / recruiter / FDE lead with public LinkedIn profiles, any email the company or person has published, and the company's email pattern where it is documented.</li>
-      <li><b>Verify.</b> A second, sceptical pass re-checked each listing, each person's current title and each email through search results, and labels what it could and could not confirm. LinkedIn and most job boards block automated page fetches, so a <span class="tag tag-warn">listing unconfirmed</span> or <span class="unverified">unverified</span> label means “not confirmed”, not “wrong”.</li>
-      <li><b>Score.</b> 1–10 against fit for a London-based applied-AI engineer, with a one-line rationale, a suggested contact and an outreach angle.</li>
-      <li><b>Gate.</b> You approve, contact or pass on each one. Status, notes and draft edits are saved in this browser and exportable as CSV.</li>
-    </ol>
-    <p class="fine">Email addresses marked <span class="tag tag-guess">guess</span> are derived from a documented company pattern and were not seen published anywhere. Verify before sending (a free checker such as Hunter or a quick LinkedIn message works). Nothing on this page sends automatically: “Send email” opens your mail client, and the LinkedIn buttons copy the note and open the person's profile.</p>
+  <section class="guides">
+    <details class="guide">
+      <summary>Before you send: three quick checks</summary>
+      <ul>
+        <li><b>Is the job still open?</b> Roles marked <span class="pill pill-warn">Check it's still open</span> weren't seen in the last few weeks. Open the job link first.</li>
+        <li><b>Is the email right?</b> Addresses marked <span class="pill pill-warn">Likely, check first</span> follow the company's usual format but weren't seen published. A LinkedIn message is the safer first step.</li>
+        <li><b>Is the person right?</b> <span class="pill pill-ok">Confirmed</span> means search results show them at the company in that job. <span class="pill">Not confirmed</span> means we couldn't check, not that it's wrong.</li>
+      </ul>
+    </details>
+    <details class="guide">
+      <summary>How this list was made</summary>
+      <ol>
+        <li><b>Found</b> open forward-deployed AI roles on careers pages and job boards, from eight angles at once.</li>
+        <li><b>Researched</b> each company: what its forward-deployed team does, who hires for it, and any email address it publishes.</li>
+        <li><b>Checked</b> each job, person and email again through search, and labelled what couldn't be confirmed.</li>
+        <li><b>Scored</b> each role 1 to 10 for you, wrote the messages, then had an editor check them against your real experience.</li>
+      </ol>
+      <p class="fine">Nothing is sent for you. "Send email" opens your own email app, and the LinkedIn buttons copy the message and open the profile. Your progress, notes and edits stay in this browser only.</p>
+    </details>
   </section>
 </main>
 
 <footer class="wrap foot">
   <span id="foot-meta"></span>
-  <span>Data lives in <code>data/opportunities.json</code>. Re-run the research and rebuild with <code>node scripts/build-data.mjs</code>.</span>
+  <span>Data: <code>data/opportunities.json</code></span>
 </footer>
 
-<!-- Profile drawer -->
+<!-- Your details drawer -->
 <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
   <div class="drawer-head">
-    <h2 id="drawer-title">Your profile</h2>
-    <button class="icon-btn" id="btn-drawer-close" type="button" aria-label="Close">✕</button>
+    <h2 id="drawer-title">Your details</h2>
+    <button class="icon-btn" id="btn-drawer-close" type="button" aria-label="Close">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
   </div>
-  <p class="fine">Used to fill <code>{{my_name}}</code>, <code>{{my_email}}</code>, <code>{{my_linkedin}}</code>, <code>{{my_headline}}</code>, <code>{{my_cv}}</code> and <code>{{my_phone}}</code> in every draft. Defaults come from <code>data/profile.json</code> (published with the site); your edits are saved in this browser only.</p>
+  <p class="fine">These fill in your name, links and signature in every message. Saved in this browser only.</p>
   <form id="profile-form" class="form">
     <label>Full name<input name="name" type="text" required></label>
     <label>Email<input name="email" type="email" required></label>
+    <label>LinkedIn profile<input name="linkedin" type="url"></label>
+    <label>CV or portfolio link<input name="cv_url" type="url"></label>
     <label>Phone (optional)<input name="phone" type="text"></label>
-    <label>LinkedIn URL<input name="linkedin" type="url"></label>
-    <label>CV / portfolio URL<input name="cv_url" type="url"></label>
     <label>One-line headline<input name="headline" type="text"></label>
-    <label>Preferred mail client
+    <label>Send emails with
       <select name="mail_client">
-        <option value="mailto">Default mail app (mailto)</option>
-        <option value="gmail">Gmail (web)</option>
-        <option value="outlook">Outlook (web)</option>
+        <option value="mailto">My email app</option>
+        <option value="gmail">Gmail in the browser</option>
+        <option value="outlook">Outlook in the browser</option>
       </select>
     </label>
     <label>Email signature<textarea name="signature" rows="4"></textarea></label>
     <div class="row">
-      <button class="btn btn-primary" type="submit">Save profile</button>
+      <button class="btn btn-primary" type="submit">Save</button>
       <button class="btn btn-ghost" type="button" id="btn-profile-reset">Reset to defaults</button>
     </div>
   </form>
   <hr>
-  <h3>Tracker data</h3>
+  <h3>Your progress data</h3>
+  <p class="fine">Back up your statuses, notes and edits, or move them to another browser.</p>
   <div class="row">
-    <button class="btn btn-ghost btn-sm" type="button" id="btn-backup">Download tracker JSON</button>
-    <label class="btn btn-ghost btn-sm file-btn">Restore JSON<input type="file" id="file-restore" accept="application/json" class="visually-hidden"></label>
-    <button class="btn btn-danger btn-sm" type="button" id="btn-wipe">Clear tracker</button>
+    <button class="btn btn-ghost btn-sm" type="button" id="btn-backup">Download backup</button>
+    <label class="btn btn-ghost btn-sm file-btn">Restore backup<input type="file" id="file-restore" accept="application/json" class="visually-hidden"></label>
+    <button class="btn btn-ghost btn-sm show-sm" type="button" id="btn-export-2">Download CSV</button>
+    <button class="btn btn-danger btn-sm" type="button" id="btn-wipe">Clear everything</button>
   </div>
 </aside>
 
@@ -155,95 +180,134 @@
 
 <template id="tpl-card">
   <article class="card" data-id="">
-    <header class="card-head">
-      <div class="card-title">
-        <div class="score" title="Fit score out of 10"><b class="score-n"></b><span>/10</span></div>
-        <div>
-          <h2 class="company"></h2>
-          <p class="role"></p>
-          <p class="meta"></p>
-        </div>
+    <div class="card-main">
+      <div class="score" title="How well this role fits you, out of 10">
+        <b class="score-n"></b><span class="score-label"></span>
       </div>
-      <div class="card-actions">
-        <select class="status" aria-label="Status">
-          <option value="new">New</option>
-          <option value="shortlisted">Shortlisted</option>
-          <option value="contacted">Contacted</option>
-          <option value="replied">Replied</option>
-          <option value="interviewing">Interviewing</option>
-          <option value="offer">Offer</option>
-          <option value="passed">Passed / rejected</option>
-        </select>
-        <a class="btn btn-ghost btn-sm job-link" target="_blank" rel="noopener">View job ↗</a>
+      <div class="card-head">
+        <h2 class="company"></h2>
+        <p class="role"></p>
       </div>
-    </header>
-
-    <div class="card-body">
-      <div class="col">
-        <p class="rationale"></p>
-        <dl class="kv">
-          <div><dt>Why it's FDE</dt><dd class="why-fde"></dd></div>
-          <div><dt>Suggested contact</dt><dd class="suggested"></dd></div>
-          <div><dt>Angle</dt><dd class="angle"></dd></div>
-          <div><dt>Team context</dt><dd class="team"></dd></div>
-          <div><dt>Company</dt><dd class="about"></dd></div>
-          <div><dt>Caveats</dt><dd class="caveats"></dd></div>
-          <div><dt>Also open</dt><dd class="also-open"></dd></div>
-        </dl>
-        <p class="tags"></p>
-        <p class="verify-line"></p>
+      <div class="card-body">
+        <div class="chips"></div>
+        <p class="why-fit"></p>
       </div>
-
-      <div class="col">
-        <h3 class="sub">People to approach</h3>
-        <ul class="contacts"></ul>
-        <p class="fine people-search"></p>
+      <div class="card-side">
+        <label class="status-wrap"><span class="visually-hidden">Progress</span>
+          <select class="status">
+            <option value="new">Not contacted</option>
+            <option value="shortlisted">Saved</option>
+            <option value="contacted">Contacted</option>
+            <option value="replied">Replied</option>
+            <option value="interviewing">Interviewing</option>
+            <option value="offer">Offer</option>
+            <option value="passed">Not interested</option>
+          </select>
+        </label>
+        <a class="btn btn-ghost btn-sm job-link" target="_blank" rel="noopener">View job
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
       </div>
     </div>
 
-    <details class="outreach">
-      <summary>Outreach drafts <span class="fine">— pick a contact, edit if you like, send with one click</span></summary>
-      <div class="outreach-body">
-        <div class="outreach-top">
-          <label>Send to
+    <div class="card-foot">
+      <p class="best-contact"></p>
+      <div class="foot-actions">
+        <button type="button" class="btn btn-ghost btn-details" aria-expanded="false">Details &amp; people
+          <svg class="i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+        <button type="button" class="btn btn-primary btn-write" aria-expanded="false">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg><span class="write-label">Write a message</span></button>
+      </div>
+    </div>
+
+    <div class="details" hidden>
+      <section class="fit">
+        <h3>Why it's a fit</h3>
+        <p class="rationale"></p>
+        <div class="watch"><h4>Watch out for</h4><ul class="caveats"></ul></div>
+        <h3>What the team does</h3>
+        <p class="team"></p>
+        <h3>About the company</h3>
+        <p class="about"></p>
+        <div class="also"><h3>Other open roles here</h3><ul class="also-open"></ul></div>
+        <details class="raw-notes"><summary>Research notes</summary><p class="raw"></p><p class="fine job-note"></p></details>
+      </section>
+      <section class="people">
+        <h3>People to contact</h3>
+        <ul class="contacts"></ul>
+        <p class="fine people-search"></p>
+      </section>
+    </div>
+
+    <div class="composer" hidden>
+      <div class="composer-head">
+        <h3 class="composer-title">Write a message</h3>
+        <button type="button" class="icon-btn btn-close-composer" aria-label="Close the message panel">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+
+      <div class="step">
+        <span class="step-n" aria-hidden="true">1</span>
+        <div class="step-body">
+          <label class="step-label">Who to send it to
             <select class="contact-pick"></select>
           </label>
           <div class="to-line"></div>
         </div>
-        <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-tab="email" role="tab" aria-selected="true">Email</button>
-          <button type="button" class="tab" data-tab="note" role="tab" aria-selected="false" tabindex="-1">LinkedIn connection note</button>
-          <button type="button" class="tab" data-tab="inmail" role="tab" aria-selected="false" tabindex="-1">LinkedIn message</button>
-        </div>
-        <div class="pane" data-pane="email">
-          <label>Subject<input class="d-subject" type="text"></label>
-          <label>Body<textarea class="d-email" rows="12"></textarea></label>
-          <div class="row">
-            <button type="button" class="btn btn-primary act-send">Send email ↗</button>
-            <button type="button" class="btn btn-ghost act-copy-email">Copy email</button>
-            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="email" hidden>Reset draft</button>
-          </div>
-        </div>
-        <div class="pane" data-pane="note" hidden>
-          <label>Connection note <span class="count note-count"></span><textarea class="d-note" rows="5" maxlength="300"></textarea></label>
-          <div class="row">
-            <button type="button" class="btn btn-primary act-linkedin" data-kind="note">Copy note &amp; open LinkedIn ↗</button>
-            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="note" hidden>Reset draft</button>
-          </div>
-          <p class="fine">LinkedIn caps connection notes at 300 characters (200 on some accounts). Paste it under “Connect → Add a note”.</p>
-        </div>
-        <div class="pane" data-pane="inmail" hidden>
-          <label>Message<textarea class="d-inmail" rows="10"></textarea></label>
-          <div class="row">
-            <button type="button" class="btn btn-primary act-linkedin" data-kind="inmail">Copy message &amp; open LinkedIn ↗</button>
-            <button type="button" class="btn btn-ghost btn-sm act-reset" data-field="inmail" hidden>Reset draft</button>
-          </div>
-          <p class="fine">Paste into “Message” on their profile (or InMail if you're not connected).</p>
-        </div>
-        <label class="notes-label">Your notes<textarea class="notes" rows="3" placeholder="Replies, dates, next steps…"></textarea></label>
-        <p class="fine contacted-line"></p>
       </div>
-    </details>
+
+      <div class="step">
+        <span class="step-n" aria-hidden="true">2</span>
+        <div class="step-body">
+          <span class="step-label">How to send it</span>
+          <div class="tabs" role="tablist">
+            <button type="button" class="tab active" data-tab="email" role="tab" aria-selected="true">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>Email</button>
+            <button type="button" class="tab" data-tab="note" role="tab" aria-selected="false" tabindex="-1">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-8 0M4 20c0-3 4-5 8-5s8 2 8 5M19 8v6M16 11h6"/></svg>LinkedIn note</button>
+            <button type="button" class="tab" data-tab="inmail" role="tab" aria-selected="false" tabindex="-1">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4V5z"/></svg>LinkedIn message</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="step-n" aria-hidden="true">3</span>
+        <div class="step-body">
+          <span class="step-label">Check it, then send</span>
+          <div class="pane" data-pane="email">
+            <label>Subject<input class="d-subject" type="text"></label>
+            <label>Message<textarea class="d-email" rows="12"></textarea></label>
+            <div class="row">
+              <button type="button" class="btn btn-primary act-send"><span class="send-label">Open in your email app</span>
+                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></button>
+              <button type="button" class="btn btn-ghost act-copy-email">Copy</button>
+              <button type="button" class="btn btn-link act-reset" data-field="email" hidden>Undo my edits</button>
+            </div>
+          </div>
+          <div class="pane" data-pane="note" hidden>
+            <label>Invite note <span class="count note-count"></span><textarea class="d-note" rows="4" maxlength="300"></textarea></label>
+            <div class="row">
+              <button type="button" class="btn btn-primary act-linkedin" data-kind="note">Copy and open LinkedIn
+                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></button>
+              <button type="button" class="btn btn-link act-reset" data-field="note" hidden>Undo my edits</button>
+            </div>
+            <p class="fine">On their profile, press <b>Connect</b>, then <b>Add a note</b>, then paste. LinkedIn allows up to 300 characters.</p>
+          </div>
+          <div class="pane" data-pane="inmail" hidden>
+            <label>Message<textarea class="d-inmail" rows="9"></textarea></label>
+            <div class="row">
+              <button type="button" class="btn btn-primary act-linkedin" data-kind="inmail">Copy and open LinkedIn
+                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></button>
+              <button type="button" class="btn btn-link act-reset" data-field="inmail" hidden>Undo my edits</button>
+            </div>
+            <p class="fine">Use this once you're connected, or send it as an InMail. Press <b>Message</b> on their profile and paste.</p>
+          </div>
+        </div>
+      </div>
+
+      <label class="notes-label">Your notes<textarea class="notes" rows="2" placeholder="Replies, dates, next steps"></textarea></label>
+      <p class="fine contacted-line"></p>
+    </div>
   </article>
 </template>
 

@@ -45,6 +45,8 @@ src.opportunities.forEach((o, i) => {
     }
     if (c.verified !== undefined && typeof c.verified !== 'boolean') errors.push(`${cw}: verified must be true/false`);
   });
+  if (o.fit_summary !== undefined && typeof o.fit_summary !== 'string') errors.push(`${who}: fit_summary must be text`);
+  if (o.watch_outs !== undefined && !(Array.isArray(o.watch_outs) && o.watch_outs.every((w) => typeof w === 'string'))) errors.push(`${who}: watch_outs must be a list of text`);
   const d = o.drafts || {};
   ['email_subject', 'email_body', 'linkedin_note', 'linkedin_inmail'].forEach((k) => { if (!d[k]) errors.push(`${who}: missing draft ${k}`); });
   if (d.linkedin_note) {
