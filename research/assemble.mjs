@@ -84,7 +84,9 @@ for (const c of partial.kept) {
   if (stage === 'final' && !e) { console.error(`skip ${c.company}: no enrichment`); continue; }
   let role = c.roles[0];
   let job_url = role.job_url;
-  if (v && ['closed', 'unconfirmed'].includes(jobStatus(v)) && isHttp(v.alternate_job_url)) job_url = v.alternate_job_url;
+  // Use the verifier's alternate URL only for an unconfirmed listing (same role, better link); drafts are written for the primary role.
+  const alt_job_url = v && isHttp(v.alternate_job_url) && v.alternate_job_url !== role.job_url ? v.alternate_job_url : '';
+  if (alt_job_url && jobStatus(v) === 'unconfirmed') job_url = alt_job_url;
   const contacts = (e && e.contacts ? e.contacts : []).map((ct) => {
     const vc = v && v.contacts ? v.contacts.find((x) => clean(x.name).toLowerCase() === clean(ct.name).toLowerCase()) : null;
     const ve = v && v.emails ? v.emails.find((x) => x.email && ct.email_public && x.email.toLowerCase() === ct.email_public.toLowerCase()) : null;
@@ -150,7 +152,7 @@ if (stage === 'dossier') {
   writeFileSync(outFile, JSON.stringify({ companies: out }, null, 0));
   console.log(`dossier: ${out.length} companies`);
 } else {
-  const why = (o) => !o.drafts ? 'no drafts' : o.score == null ? 'no score' : !o.verification.role_still_fde ? 'not an FDE role' : o.verification.job_status === 'closed' && !o._alt ? 'posting closed' : '';
+  const why = (o) => !o.drafts ? 'no drafts' : o.score == null ? 'no score' : !o.verification.role_still_fde ? 'not an FDE role' : o.verification.job_status === 'closed' ? 'posting closed' : '';
   const kept = out.filter((o) => !why(o));
   const dropped = out.filter((o) => why(o)).map((o) => `${o.company} (${why(o)})`);
   // Reviewed manual overrides (exact find/replace on a draft field); fail loudly if an anchor no longer matches.
