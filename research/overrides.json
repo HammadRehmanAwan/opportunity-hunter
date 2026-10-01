@@ -1,0 +1,6 @@
+[
+  { "company": "Anthropic", "field": "email_subject", "find": "grounded agents with RBAC", "replace": "Claude agents with RBAC", "why": "WYA Hub runs on Claude Sonnet (wya-hub src/lib/env.ts CHAT_MODEL)" },
+  { "company": "Anthropic", "field": "email_body", "find": "a Next.js and TypeScript chat workspace that answers only from company data", "replace": "a Next.js and TypeScript workspace where Claude answers only from company data", "why": "WYA Hub runs on Claude Sonnet" },
+  { "company": "Anthropic", "field": "linkedin_note", "find": "a tool-gated agent workspace", "replace": "a tool-gated Claude workspace", "why": "WYA Hub runs on Claude Sonnet" },
+  { "company": "Anthropic", "field": "linkedin_inmail", "find": "This year I built a chat workspace for a London startup", "replace": "This year I built a Claude-powered workspace for a London startup", "why": "WYA Hub runs on Claude Sonnet" }
+]
