@@ -1,7 +1,7 @@
 name: Deploy to GitHub Pages
+# Manual only: a Pages site is public, and data/opportunities.json is a private contact list.
+# Run it from the Actions tab only if you have decided to publish (see README > Privacy first).
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

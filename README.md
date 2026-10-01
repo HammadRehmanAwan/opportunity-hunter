@@ -22,18 +22,11 @@ npx serve .          # or: python3 -m http.server 8080
 
 ## Deploy
 
-This folder is designed to be the **root of its own repository** (`opportunity-hunter`). The deploy configs only take effect there:
+Pushing to this repo only runs **Validate data** (`.github/workflows/ci.yml`), which checks the data and that `data/opportunities.js` is up to date. Nothing is published automatically.
 
-- **GitHub Pages** — push to `main`; `.github/workflows/deploy-pages.yml` validates the data, checks `data/opportunities.js` is up to date, and publishes the site. Pages needs a public repo or a paid plan for private repos.
-- **Netlify** — `netlify.toml` is included; connect the repo and it deploys as-is. (If the folder lives inside another repo, set the Netlify *base directory* to it.)
-
-To move it into a fresh empty repo:
-
-```bash
-git clone --depth 1 -b claude/opportunity-hunter-ai-engineers-83pl01 https://github.com/HammadRehmanAwan/Zong_Test tmp-zong
-cd tmp-zong/opportunity-hunter && git init -b main && git add -A && git commit -m "Opportunity Hunter" \
-  && git remote add origin https://github.com/HammadRehmanAwan/opportunity-hunter.git && git push -u origin main
-```
+- **Use it privately (recommended)**: clone the repo and open `index.html` in a browser.
+- **GitHub Pages**: run **Deploy to GitHub Pages** by hand from the Actions tab. Pages needs a public repo or a paid plan, and the site it creates is public.
+- **Netlify**: `netlify.toml` is included. Connect the repo and turn on password protection before sharing the link.
 
 ## How the one-click actions work
 
