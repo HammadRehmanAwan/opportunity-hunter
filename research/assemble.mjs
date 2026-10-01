@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const [stage, SP, outFile] = process.argv.slice(2);
-const TODAY = '2026-09-30';
+const TODAY = process.env.OH_TODAY || new Date().toISOString().slice(0, 10);
 const partial = JSON.parse(readFileSync(join(SP, 'research-partial.json'), 'utf8'));
 const readOutputs = (prefix) => readdirSync(join(SP, 'results')).filter((f) => f.startsWith(prefix) && f.endsWith('.json'))
   .map((f) => { const j = JSON.parse(readFileSync(join(SP, 'results', f), 'utf8')); return j.result || j; });
@@ -67,6 +67,14 @@ function guessEmail(pattern, name, website) {
 
 const confOf = (x) => { const m = String(x || '').toLowerCase().match(/^\s*(high|medium-low|low-medium|medium|low|none)/); return m ? m[1] : ''; };
 const patternOf = (x) => { const m = String(x || '').match(/[a-z._{}-]+@[a-z0-9.-]+\.[a-z]{2,}/i); return m ? m[0].toLowerCase() : ''; };
+// Verifier notes are written for us; keep a short, reader-facing sentence and drop tooling chatter.
+const tidyIssue = (t) => {
+  let x = clean(t).replace(/\([^)]*\b(blocked|budget|quota|searches?|fetch\w*|egress|proxy|snippet)\b[^)]*\)/gi, '');
+  const sentences = x.split(/(?<=[.;])\s+/).filter((z) => !/\b(blocked|budget|quota|no searches|egress|proxy|could not fetch|couldn't fetch|couldn't open|session|api endpoint)\b/i.test(z));
+  x = (sentences[0] || '').replace(/\s+([.,;:])/g, '$1').replace(/\s{2,}/g, ' ').trim().replace(/[;,:]$/, '.');
+  if (x.length > 180) x = x.slice(0, 177).replace(/\s+\S*$/, '') + '…';
+  return x;
+};
 const RECRUIT = /^(careers?|jobs|talent|talentacquisition|recruit\w*|hiring|people|hr|join|work)@/i;
 // A published address counts only if it is on a company domain (website, documented pattern or careers inbox).
 // Personal inboxes found in commits/CVs are deliberately not used for cold outreach.
@@ -83,7 +91,9 @@ for (const c of partial.kept) {
   const v = run && run.verification;
   if (stage === 'final' && !e) { console.error(`skip ${c.company}: no enrichment`); continue; }
   let role = c.roles[0];
-  let job_url = role.job_url;
+  // Public page for ATS API URLs (e.g. SmartRecruiters posting API -> jobs.smartrecruiters.com)
+  const publicUrl = (u) => { const m = String(u || '').match(/^https:\/\/api\.smartrecruiters\.com\/v1\/companies\/([^/]+)\/postings\/(\d+)/); return m ? `https://jobs.smartrecruiters.com/${m[1]}/${m[2]}` : u; };
+  let job_url = publicUrl(role.job_url);
   // Use the verifier's alternate URL only for an unconfirmed listing (same role, better link); drafts are written for the primary role.
   const alt_job_url = v && isHttp(v.alternate_job_url) && v.alternate_job_url !== role.job_url ? v.alternate_job_url : '';
   if (alt_job_url && jobStatus(v) === 'unconfirmed') job_url = alt_job_url;
@@ -104,7 +114,22 @@ for (const c of partial.kept) {
       verified: !!(vc && vc.verified === true),
       why_them: clean(ct.why_them || (vc && vc.note) || ''),
     };
-  }).filter((ct) => ct.name);
+  }).map((ct) => {
+    // Researcher notes sometimes land in the name ("Jane Doe (née Smith)"): keep the name clean, move the note.
+    const m = ct.name.match(/^([^()]+?)\s*\(([^)]*)\)\s*$/);
+    if (!m) return ct;
+    if (/real name not shown|handle only|github handle/i.test(m[2]) && !/\s/.test(m[1].trim())) return null;   // a handle, not a person's name
+    return { ...ct, name: m[1].trim(), why_them: clean(`(${m[2]}) ${ct.why_them}`) };
+  }).filter((ct) => ct && ct.name)
+    // Best contact first (it becomes the default recipient): verified, then role, then has LinkedIn, then has email.
+    .map((ct, i) => ({ ct, i }))
+    .sort((a, b) => {
+      const ROLE = { hiring_manager: 0, fde_lead: 1, recruiter: 2, founder: 3, team_member: 4 };
+      const core = (x) => (['hiring_manager', 'fde_lead', 'recruiter'].includes(x.ct.role_type) ? 0 : 1);
+      const k = (x) => [core(x), x.ct.verified ? 0 : 1, ROLE[x.ct.role_type] ?? 5, x.ct.linkedin_url ? 0 : 1, x.ct.email ? 0 : 1, x.i];
+      const ka = k(a), kb = k(b); for (let j = 0; j < ka.length; j++) if (ka[j] !== kb[j]) return ka[j] - kb[j]; return 0;
+    })
+    .map((x) => x.ct);
   // careers inbox: keep only when published (verifier confirmed, or enrichment cites a source and verifier did not refute)
   let careers_email = '', careers_src = '';
   if (e && isEmail(e.careers_email)) {
@@ -130,7 +155,7 @@ for (const c of partial.kept) {
     region: (dd && dd.region) || 'Other', remote_policy: (dd && dd.remote_policy) || (role.remote_policy || 'unknown'),
     job_url, posted_or_seen: clean(role.posted_or_seen), employment_type: clean(role.employment_type), salary_text: clean(role.salary_text),
     summary: clean(role.summary), why_fde: clean(role.why_fde),
-    other_roles: c.roles.slice(1, 6).map((r) => ({ role_title: clean(r.role_title), location: clean(r.location), job_url: r.job_url })),
+    other_roles: c.roles.slice(1, 6).map((r) => ({ role_title: clean(r.role_title), location: clean(r.location), job_url: publicUrl(r.job_url) })),
     score, rationale: clean(dd && dd.rationale), suggested_contact: clean(dd && dd.suggested_contact), outreach_angle: clean(dd && dd.outreach_angle), fit_notes: clean(dd && dd.fit_notes),
     company_type: clean(dd && dd.company_type), tags: (dd && dd.tags) || [],
     careers_url: e && isHttp(e.careers_url) ? e.careers_url : '', careers_email, careers_email_source_url: careers_email && isHttp(careers_src) ? careers_src : '',
@@ -138,7 +163,7 @@ for (const c of partial.kept) {
     contacts,
     linkedin_people_search_url: e && isHttp(e.linkedin_people_search_url) ? e.linkedin_people_search_url : '',
     drafts: finalDrafts || null,
-    verification: { job_status: jobStatus(v), job_url_live: ['live_fetched', 'listed_recently'].includes(jobStatus(v)) || (!!v && v.job_url_live === true && !v.job_status), role_still_fde: !v || v.role_still_fde !== false, overall_confidence: (v && v.overall_confidence) || 'low', issues: v ? clean(v.issues).slice(0, 240) : 'Not independently re-checked; treat contacts and job status as unverified.', checked: !!v },
+    verification: { job_status: jobStatus(v), job_url_live: ['live_fetched', 'listed_recently'].includes(jobStatus(v)) || (!!v && v.job_url_live === true && !v.job_status), role_still_fde: !v || v.role_still_fde !== false, overall_confidence: (v && v.overall_confidence) || 'low', issues: v ? tidyIssue(v.issues) : 'Not independently re-checked; treat contacts and job status as unverified.', checked: !!v },
     sources: [...new Set([role.source_url, role.job_url, ...(e && e.notes ? [] : [])].filter(isHttp))],
     last_verified: TODAY,
     _alt: job_url !== role.job_url,
@@ -155,6 +180,21 @@ if (stage === 'dossier') {
   const why = (o) => !o.drafts ? 'no drafts' : o.score == null ? 'no score' : !o.verification.role_still_fde ? 'not an FDE role' : o.verification.job_status === 'closed' ? 'posting closed' : '';
   const kept = out.filter((o) => !why(o));
   const dropped = out.filter((o) => why(o)).map((o) => `${o.company} (${why(o)})`);
+  // Reconcile layer: a reviewer re-read each record against its verification and changed only what it contradicted.
+  const reconcile = new Map();
+  for (const run of readOutputs('reconcile-')) for (const r of (run.results || [])) reconcile.set(r.company, r);
+  let reconciled = 0;
+  for (const o of kept) {
+    const r = reconcile.get(o.company); if (!r || !r.changed) continue;
+    reconciled++;
+    if (Number.isInteger(r.score) && r.score >= 1 && r.score <= 10) o.score = r.score;
+    if (['UK', 'Europe', 'Remote', 'US', 'Other'].includes(r.region)) o.region = r.region;
+    if (['remote', 'hybrid', 'onsite', 'unknown'].includes(r.remote_policy)) o.remote_policy = r.remote_policy;
+    if (r.rationale) o.rationale = clean(r.rationale);
+    if (r.fit_notes) o.fit_notes = clean(r.fit_notes);
+    if (r.drafts_changed && r.drafts && r.drafts.email_body && r.drafts.linkedin_note) o.drafts = r.drafts;
+  }
+  if (reconcile.size) console.log(`reconcile: ${reconciled} records changed of ${reconcile.size} reviewed`);
   // Reviewed manual overrides (exact find/replace on a draft field); fail loudly if an anchor no longer matches.
   let overrides = []; try { overrides = JSON.parse(readFileSync(join(SP, 'overrides.json'), 'utf8')); } catch (err) { overrides = []; }
   for (const ov of overrides) {

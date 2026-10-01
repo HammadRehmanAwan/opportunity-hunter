@@ -8,7 +8,8 @@ How `data/opportunities.json` was produced, so the list can be refreshed. It mir
 | 2. Enrich | `workflows/2-enrich-verify-slice.js` | Per company: what the forward-deployed team does, 2–5 people to approach with public LinkedIn URLs and evidence links, any email the company or person has published, and the documented company email format. |
 | 3. Verify | `workflows/3-verify-lean.js` | A sceptical, search-only pass (LinkedIn and most ATS hosts block automated fetches) that labels each listing `live_fetched`, `listed_recently`, `unconfirmed` or `closed`, confirms or rejects each contact, and checks each email was actually published. |
 | 4. Score + draft | `workflows/4-score-and-draft.js` | Scores each company 1–10 for the candidate in `candidate.txt`, writes the email, LinkedIn note and LinkedIn message, then a second editor agent fact-checks each batch against the dossier and the candidate profile and rewrites anything unsupported. |
-| 5. Assemble | `assemble.mjs` | Merges everything into `data/opportunities.json`, applies `overrides.json`, builds pattern-based email guesses, and writes a QA report. |
+| 5. Reconcile | `workflows/5-reconcile.js` | Drafting ran before verification finished, so a final reviewer re-reads each record against its verification and changes only what it contradicts (region now US-only, stale listing, more senior than assumed), including the drafts where a claim no longer holds. |
+| 6. Assemble | `assemble.mjs` | Merges everything into `data/opportunities.json`, applies `overrides.json`, builds pattern-based email guesses, and writes a QA report. |
 
 The workflow scripts run with Claude Code's Workflow tool; their `args` point at a scratch directory holding the intermediate JSON files.
 

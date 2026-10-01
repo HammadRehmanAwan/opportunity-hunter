@@ -123,8 +123,8 @@ await page.fill('#profile-form input[name="name"]', 'Test Person');
 await page.click('#profile-form button[type="submit"]');
 const card3 = page.locator('.card').first();
 await card3.locator('.outreach summary').click();
-const body3 = await card3.locator('.d-email').inputValue();
-check(/Test Person/.test(body3), 'profile name flows into the email draft');
+const inmail3 = await card3.locator('.d-inmail').inputValue();
+check(/Test Person/.test(inmail3), 'profile name flows into the drafts ({{my_name}})');
 
 // Theme toggle + CSV export
 await page.click('#btn-theme');
