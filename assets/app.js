@@ -221,8 +221,11 @@
     if (o.company_type) tags.push(['', o.company_type]);
     (o.tags || []).forEach((t) => tags.push(['', t]));
     if (o.verification) {
-      tags.push(o.verification.job_url_live === true ? ['tag-ok', 'job link verified live'] : ['tag-warn', 'job link unverified']);
-      if (o.verification.overall_confidence) tags.push([o.verification.overall_confidence === 'high' ? 'tag-ok' : o.verification.overall_confidence === 'low' ? 'tag-bad' : 'tag-warn', `${o.verification.overall_confidence} confidence`]);
+      const v = o.verification;
+      const js = v.job_status || (v.job_url_live === true ? 'listed_recently' : 'unconfirmed');
+      tags.push({ live_fetched: ['tag-ok', 'job page checked live'], listed_recently: ['tag-ok', 'listing seen recently'], unconfirmed: ['tag-warn', 'listing unconfirmed'], closed: ['tag-bad', 'posting may be closed'] }[js] || ['tag-warn', 'listing unconfirmed']);
+      if (v.checked === false) tags.push(['tag-warn', 'not re-checked']);
+      else if (v.overall_confidence) tags.push([v.overall_confidence === 'high' ? 'tag-ok' : v.overall_confidence === 'low' ? 'tag-bad' : 'tag-warn', `${v.overall_confidence} confidence`]);
     }
     if (o.email_pattern) tags.push(['tag-wrap', `pattern ${o.email_pattern}${o.email_pattern_confidence ? ` (${o.email_pattern_confidence})` : ''}`]);
     $('.tags', el).innerHTML = tags.map(([c, t]) => `<span class="tag ${c}">${esc(t)}</span>`).join('');

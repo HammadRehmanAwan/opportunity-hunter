@@ -32,6 +32,7 @@ src.opportunities.forEach((o, i) => {
   URL_FIELDS.forEach((k) => { if (o[k] && !isHttp(o[k])) errors.push(`${who}: ${k} must start with http(s)://`); });
   if (o.careers_email && !isEmail(o.careers_email)) errors.push(`${who}: careers_email is not an email address`);
   if (o.verification && typeof o.verification.job_url_live !== 'boolean') errors.push(`${who}: verification.job_url_live must be true/false`);
+  if (o.verification && o.verification.job_status !== undefined && !['live_fetched', 'listed_recently', 'unconfirmed', 'closed'].includes(o.verification.job_status)) errors.push(`${who}: verification.job_status must be live_fetched|listed_recently|unconfirmed|closed`);
   if (o.contacts !== undefined && !Array.isArray(o.contacts)) errors.push(`${who}: contacts must be an array`);
   (Array.isArray(o.contacts) ? o.contacts : []).forEach((c, j) => {
     const cw = `${who} contact ${j} (${c && c.name ? c.name : '?'})`;

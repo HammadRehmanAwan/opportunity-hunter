@@ -60,7 +60,7 @@ careers_email, careers_email_source_url, email_pattern, email_pattern_confidence
 contacts[]: { name, title, role_type, linkedin_url, email, email_status (verified_public|pattern_guess), email_source_url, evidence_url, verified (true|false), why_them },
 linkedin_people_search_url,
 drafts: { email_subject, email_body, linkedin_note, linkedin_inmail },   // support {{placeholders}}
-verification: { job_url_live, overall_confidence, issues }, sources[], last_verified
+verification: { job_status (live_fetched|listed_recently|unconfirmed|closed), job_url_live, role_still_fde, overall_confidence, issues, checked }, sources[], last_verified
 ```
 
 Placeholders available in drafts: `{{first_name}}`, `{{contact_name}}`, `{{contact_title}}`, `{{company}}`, `{{role}}`, `{{my_name}}`, `{{my_first_name}}`, `{{my_email}}`, `{{my_linkedin}}`, `{{my_phone}}`, `{{my_cv}}`, `{{my_headline}}`, `{{signature}}`.
