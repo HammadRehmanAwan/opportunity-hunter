@@ -192,8 +192,11 @@
     $('.score', el).classList.add(scoreClass(o.score)); $('.score-n', el).textContent = o.score ?? '–';
     titleEl.innerHTML = isHttp(o.company_url) ? `<a href="${esc(o.company_url)}" target="_blank" rel="noopener">${esc(o.company)}</a>` : esc(o.company);
     $('.role', el).textContent = o.role_title || '';
-    $('.meta', el).innerHTML = [o.location, o.remote_policy && o.remote_policy !== 'unknown' ? o.remote_policy : '', o.employment_type, o.salary_text, o.posted_or_seen ? `seen ${o.posted_or_seen}` : '']
+    const short = (t, n) => (t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : t);
+    const seenText = o.posted_or_seen ? short(/^(seen|posted|listed|updated)\b/i.test(o.posted_or_seen) ? o.posted_or_seen : `seen ${o.posted_or_seen}`, 48) : '';
+    $('.meta', el).innerHTML = [o.location, o.remote_policy && o.remote_policy !== 'unknown' ? o.remote_policy : '', o.employment_type, o.salary_text ? short(o.salary_text, 40) : '', seenText]
       .filter(Boolean).map((t) => `<span>${esc(t)}</span>`).join('');
+    if (o.posted_or_seen) $('.meta', el).title = o.posted_or_seen;
 
     const job = $('.job-link', el);
     if (isHttp(o.job_url)) job.href = o.job_url; else job.replaceWith(Object.assign(document.createElement('span'), { className: 'tag tag-warn', textContent: 'No live link' }));
