@@ -230,7 +230,8 @@ if (stage === 'dossier') {
     for (const t of [o.fit_summary || '', ...(o.watch_outs || [])]) {
       if (/\u2014/.test(t)) qa.push(`${o.company}.plain: em-dash`);
       if (/\b(req|reqs|JD|ATS|crawler|aggregator|snippet)\b/.test(t) || /\b20\d\d-\d\d-\d\d\b/.test(t)) qa.push(`${o.company}.plain: jargon or ISO date: ${t.slice(0, 60)}`);
-      if (/\b(he|his|him)\b/i.test(t)) qa.push(`${o.company}.plain: third person: ${t.slice(0, 60)}`);
+      const namesContact = o.contacts.some((ct) => ct.name && t.includes(ct.name.split(' ')[0]));
+      if (/\b(he|his|him)\b/i.test(t) && !namesContact) qa.push(`${o.company}.plain: third person: ${t.slice(0, 60)}`);
     }
     if (o.fit_summary && o.fit_summary.length > 260) qa.push(`${o.company}.plain: fit_summary ${o.fit_summary.length} chars`);
     const words = d.email_body.split(/\s+/).filter(Boolean).length; if (words < 100 || words > 190) qa.push(`${o.company}: email ${words} words`);

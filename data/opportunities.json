@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated_at": "2026-10-01T13:48:59.775Z",
+    "generated_at": "2026-10-01T14:10:29.916Z",
     "target_role": "Forward Deployed AI Engineer",
     "candidate_location": "London, UK",
     "companies_researched": 152,
@@ -153,7 +153,13 @@
         "https://www.anthropic.com/careers/jobs",
         "https://job-boards.greenhouse.io/anthropic/jobs/5423029008"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "You would build Claude apps and agents for UK businesses as a London forward-deployed engineer (FDE). Your Claude tool use, access control, audit log and evaluation work maps directly.",
+      "watch_outs": [
+        "Anthropic's hiring bar is very high, and you have about 1.5 years in AI.",
+        "The seniority level and remote policy are not stated, so ask about both.",
+        "Travel to customers is likely."
+      ]
     },
     {
       "id": "databricks-ai-forward-deployed-engineer-london",
@@ -300,7 +306,13 @@
       "sources": [
         "https://www.databricks.com/company/careers/professional-services-operations/ai-forward-deployed-engineer---london-8593713002?gh_jid=8593713002"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This UK-remote AI FDE role fits your work on retrieval-augmented generation (RAG), agents and MLflow, and unlike the other London FDE openings it is not senior level.",
+      "watch_outs": [
+        "You have no Databricks platform or Spark experience.",
+        "The job page could not be opened directly, so confirm the details before you apply.",
+        "Aim for this role, as the other London FDE openings are senior or architect level."
+      ]
     },
     {
       "id": "salesforce-forward-deployed-engineer",
@@ -448,7 +460,13 @@
         "https://raw.githubusercontent.com/by-justin/open-indeed/gh-pages/jobs/salesforce_JR346373.html",
         "https://salesforce.wd12.myworkdayjobs.com/en-US/External_Career_Site/job/United-Kingdom---London/Forward-Deployed-Engineer_JR346373"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "You would deploy Agentforce for customers in London, and your CRM, Slack and Claude automation work maps closely to it. Salesforce also has an established FDE team.",
+      "watch_outs": [
+        "Your CRM work is in HubSpot, and you have no Salesforce, Apex or Agentforce experience.",
+        "Expect around 25% travel.",
+        "Seniority and remote policy are not stated, and no recruiter has been found."
+      ]
     },
     {
       "id": "servicenow-forward-deployed-solution-engineer-applied-ai-fde",
@@ -574,7 +592,13 @@
         "https://raw.githubusercontent.com/clarmso/job-board-crawler/main/data/ServiceNow/2026/744000151908299.json",
         "https://api.smartrecruiters.com/v1/companies/ServiceNow/postings/744000151908299"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London role puts you on embedded, agent-based AI work with large language models (LLMs) in a strong FDE team. It was re-posted recently and is shown as active.",
+      "watch_outs": [
+        "Seniority is not stated, and another listing says hybrid and adds Amsterdam or Dublin.",
+        "The 'Solution Engineer' title may mean the role leans towards pre-sales work.",
+        "Apply through careers.servicenow.com. The named recruiter is in San Francisco, not Europe."
+      ]
     },
     {
       "id": "langchain-deployed-architect-professional-services-london",
@@ -705,7 +729,13 @@
         "https://github.com/rasulshaikh/lumen-fde/blob/main/reports/market/index.json",
         "https://jobs.ashbyhq.com/langchain/faeb56fd-e7d6-47d6-babe-e35315969206"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "Your agent and evaluation work fits this London professional services role, at a company with an established deployed engineering team.",
+      "watch_outs": [
+        "'Architect' suggests a senior role, and it adds Kubernetes and infrastructure as code.",
+        "Your profile does not show LangGraph or LangSmith experience.",
+        "The posting date is unknown, and no London contact or recruiter has been found."
+      ]
     },
     {
       "id": "palantir-technologies-forward-deployed-software-engineer",
@@ -843,7 +873,13 @@
         "https://www.palantir.com/uk/careers/",
         "https://jobs.lever.co/palantir/5168e8fd-fec1-4fea-b7a1-81bdaea65850"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London hybrid role is the original FDE job, and a UK new-graduate track shows it is open to early-career people. Your LLM workflow and large-scale data work fits.",
+      "watch_outs": [
+        "Expect between 25% and 75% travel.",
+        "The UK Government and NATO versions of the role are likely to need security clearance.",
+        "The stack includes Java and C++, and your CRM and Slack automation is less central here."
+      ]
     },
     {
       "id": "scale-ai-senior-full-stack-software-engineer-forward-deployed-gps",
@@ -967,7 +1003,13 @@
         "https://www.dreamworkhq.com/job/83fa6749-d571-4dab-b604-88fd4d66b733",
         "https://scale.com/careers/4673310005"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This is a genuine forward-deployed role in London, where you would work as a full-stack engineer with a focus on public-sector projects.",
+      "watch_outs": [
+        "The title is Senior, which counts against you.",
+        "Public-sector work may need UK security clearance.",
+        "The listing is uncertain. The London Frontier Agents Engineer role may be a better fit."
+      ]
     },
     {
       "id": "cognition-deployed-engineer-uk",
@@ -1099,7 +1141,13 @@
       "sources": [
         "https://builtinlondon.uk/job/deployed-engineer-uk/7208422"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "You would work inside enterprise teams in London to roll out Devin, at a fast-growing company with a large deployed engineering team and a named team lead on LinkedIn.",
+      "watch_outs": [
+        "Expect 25% to 50% travel, and the seniority level is not stated.",
+        "Interviews include a take-home task in Devin and a simulated customer call.",
+        "The UK listing has not been rechecked recently, so confirm it is still open."
+      ]
     },
     {
       "id": "openai-forward-deployed-engineer-london",
@@ -1235,7 +1283,13 @@
         "https://jobs.ashbyhq.com/openai/cf83e70e-6949-480f-ad97-df0f22cd0283/application",
         "https://openai.com/careers/forward-deployed-engineer-london-london-uk/"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "OpenAI has a strong London FDE team, and this hybrid role is in London. Vishnu Chopra, an FDE in London, is a possible route to a referral.",
+      "watch_outs": [
+        "This job was posted in January 2026 and may have been removed, so check it is still open.",
+        "The hiring bar is likely above early-career level.",
+        "It is hybrid, three days a week in London, with around 50% travel."
+      ]
     },
     {
       "id": "gitlab-forward-deployed-engineer-emea",
@@ -1351,7 +1405,12 @@
         "https://euremotejobs.com/job/forward-deployed-engineer-emea/",
         "https://job-boards.greenhouse.io/gitlab/jobs/8522408002"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "You would work closely with customers on GitLab's agent platform, remotely from the UK, as part of a founding FDE team at a growing public company.",
+      "watch_outs": [
+        "Seniority is not stated, but a separate Staff role suggests this one is mid or senior level.",
+        "Its customers are enterprise DevSecOps teams, and you have no deep CI/CD platform experience."
+      ]
     },
     {
       "id": "accenture-ai-sdlc-forward-deployed-engineer-associate-manager-also-us-sr-ai-engineer-fde-manager-databricks",
@@ -1461,7 +1520,13 @@
         "https://github.com/alexeygrigorev/ai-engineering-field-guide/blob/main/job-market/_internal/data/scrapes/2026-09-23/all_jobs_dedup.csv",
         "https://builtin.com/job/ai-sdlc-forward-deployed-engineer-associate-manager/11207371"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "You would work hybrid in London inside client teams, in a large FDE practice building AI apps, Model Context Protocol (MCP) servers and sub-agents.",
+      "watch_outs": [
+        "The Associate Manager level likely expects more experience than your 1.5 years in AI.",
+        "Other London FDE roles at Accenture may suit your level better.",
+        "Consulting travel is possible, and Michael Tonalis is unverified, so do not use him as a referral."
+      ]
     },
     {
       "id": "atlassian-principal-forward-deployed-engineer-ai-remote-uk",
@@ -1571,7 +1636,13 @@
         "https://github.com/alexeygrigorev/ai-engineering-field-guide/blob/main/job-market/_internal/data/scrapes/2026-09-23/all_jobs_dedup.csv",
         "https://builtin.com/job/principal-forward-deployed-engineer-ai-remote-uk/11147178"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This UK-remote FDE role builds Rovo agents, and the technology it uses closely matches your own skills.",
+      "watch_outs": [
+        "Principal level is far above your 1.5 years in AI, so ask about mid-level FDE roles.",
+        "No FDE hiring manager is named, and Katrina Bugaitsova is not at Atlassian.",
+        "The posting and closing dates are not confirmed."
+      ]
     },
     {
       "id": "cohere-forward-deployed-engineer-agentic-platform-uk-europe",
@@ -1694,7 +1765,12 @@
       "sources": [
         "https://jobs.ashbyhq.com/cohere/2d256112-b336-4539-8133-a0bf7f6698f0"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This is a strong match: you would build North agents over business data in an established FDE team, fully remote from the UK.",
+      "watch_outs": [
+        "Expect 20% to 40% customer travel and at least 4 hours of overlap with GMT working hours.",
+        "Seniority is not stated, and the job may have been renamed to cover Europe only."
+      ]
     },
     {
       "id": "decagon-agent-deployment-engineer",
@@ -1837,7 +1913,13 @@
         "https://jobs.ashbyhq.com/decagon",
         "https://www.dreamworkhq.com/job/d73d5009-3dae-4461-abbb-7fba0c1b9a23"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London role builds CRM agents, which closely matches your HubSpot and Slack work. Two contacts, a CTO and the team's manager, have been verified.",
+      "watch_outs": [
+        "Seniority is not stated, and a similar US role asks for 5 or more years.",
+        "The German- and French-speaking versions need languages you do not speak.",
+        "Be ready to confirm your right to work in the UK."
+      ]
     },
     {
       "id": "elevenlabs-forward-deployed-engineer-software-engineer",
@@ -1985,7 +2067,13 @@
         "https://www.linkedin.com/jobs/view/forward-deployed-engineer-software-engineer-at-elevenlabs-4019113600",
         "https://elevenlabs.io/careers/6c4c57c1-ec72-42ba-af3a-eb7aebbde2e6/forward-deployed-engineer-software-engineer"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "ElevenLabs has a strong FDE team, and its Field CTO, Alex Holt, is a verified contact you could ask about future London FDE roles.",
+      "watch_outs": [
+        "This role is now US-only, so the London option looks out of date and you would need a visa.",
+        "The Spain version needs a Madrid commute about 3 times a week, and Sweden needs Swedish.",
+        "Voice work would be new to you."
+      ]
     },
     {
       "id": "fireworks-ai-ai-field-engineer-ai-forward-deployed-engineer-emea",
@@ -2123,7 +2211,13 @@
         "https://freehire.me/jobs/ai-forward-deployed-engineer-emea-fireworks-sd4i25ee",
         "https://job-boards.greenhouse.io/fireworksai/jobs/4329153009"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This is a real London-based field engineering role, close to FDE work, and you have two verified contacts: the Field CTO and a recruiter.",
+      "watch_outs": [
+        "It asks for 5 or more years as an FDE or solutions architect, well above your 1.5 years in AI.",
+        "Your profile shows no Kubernetes, fine-tuning or open-model inference experience.",
+        "Expect customer travel across Europe, the Middle East and Africa."
+      ]
     },
     {
       "id": "ifs-forward-deployed-engineer-platform-ai-also-fd-ai-engineer-ifs-loops-a-d-remote-us",
@@ -2233,7 +2327,13 @@
         "https://github.com/alexeygrigorev/ai-engineering-field-guide/blob/main/job-market/_internal/data/scrapes/2026-09-23/all_jobs_dedup.csv",
         "https://builtin.com/job/forward-deployed-engineer-platform-ai/11070205"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This is a genuine AI platform FDE role in Staines, hybrid and within reach of you in London, at a fast-growing company.",
+      "watch_outs": [
+        "It is now listed as senior, using Go, Kafka and Kubernetes, which are not on your CV.",
+        "It is confirmed only on third-party job sites, and no recruiter or hiring manager is known.",
+        "The London IFS Loops FDE role is also worth keeping an eye on."
+      ]
     },
     {
       "id": "kyndryl-forward-deployed-engineer-ai-agentic-engineer-also-lead-us-full-stack-fde-reqs",
@@ -2355,7 +2455,13 @@
         "https://github.com/alexeygrigorev/ai-engineering-field-guide/blob/main/job-market/_internal/data/scrapes/2026-09-23/all_jobs_dedup.csv",
         "https://builtin.com/job/forward-deployed-engineer-ai-agentic-engineer/11179644"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This mid-level agentic AI FDE role uses Python, FastAPI and retrieval-augmented generation (RAG), and you have a verified contact who is a London vice president.",
+      "watch_outs": [
+        "London is not confirmed for this exact listing, so check the location on Kyndryl's careers site.",
+        "LangGraph, CrewAI and AutoGen are not on your CV.",
+        "Expect client-site travel, and note that Kyndryl is not a high-growth company."
+      ]
     },
     {
       "id": "mistral-ai-applied-ai-forward-deployed-machine-learning-engineer-emea",
@@ -2467,7 +2573,13 @@
         "https://jobs.lever.co/mistral/77f6fd1b-65cf-45d8-9b68-594c62732f62",
         "https://jobs.ashbyhq.com/mistral.ai/37108a18-4eaa-4554-af3c-39e3556191cb"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "Mistral is a frontier AI lab with an established Applied AI FDE team, and London is one of the offices you could work from.",
+      "watch_outs": [
+        "The role is full-time on-site, and LLM fine-tuning is not on your CV.",
+        "The posting date is unknown and the job page could not be opened.",
+        "Both contacts are unverified engineers, not hiring managers."
+      ]
     },
     {
       "id": "verian-group-junior-ai-engineer-forward-deployed-engineer",
@@ -2588,7 +2700,13 @@
       "sources": [
         "https://uk.linkedin.com/jobs/view/junior-ai-engineer-forward-deployed-engineer-at-verian-group-4470887157"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This junior AI engineer and forward-deployed engineer (FDE) role builds agentic AI workflows with human oversight. The junior level suits your experience well.",
+      "watch_outs": [
+        "The job is in Vilnius, Lithuania (hybrid), not London, so you would need to relocate.",
+        "It sits with PPMI, part of Verian in Lithuania, and pay is in euros.",
+        "The only confirmed contact works in UK research data science, not the AI team."
+      ]
     },
     {
       "id": "xai-forward-deployed-ai-engineer-enterprise",
@@ -2720,7 +2838,13 @@
       "sources": [
         "https://job-boards.greenhouse.io/xai/jobs/4701523007"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This forward-deployed engineer (FDE) role on xAI's enterprise go-to-market team lists London, and its focus on large language model (LLM) integration matches your work closely.",
+      "watch_outs": [
+        "The job is undated and its page could not be opened, so check it is still open.",
+        "It likely expects more seniority than your roughly 1.5 years in AI.",
+        "San Francisco and Palo Alto are listed before London, and the remote policy is unknown."
+      ]
     },
     {
       "id": "nearform-forward-deployed-engineer-perm-uk-remote-travel",
@@ -2847,7 +2971,13 @@
       "sources": [
         "https://job-boards.greenhouse.io/nearform/jobs/7619129003"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This is a genuine forward-deployed engineer (FDE) role deploying agentic AI with enterprise clients. Nearform has confirmed UK contacts, so you could ask them about a UK seat.",
+      "watch_outs": [
+        "The UK post looks to have been taken down, so check whether it is still open.",
+        "The live version is US remote with travel, so it likely needs US work authorisation.",
+        "A UK seat would only come from a speculative approach, and seniority is not stated."
+      ]
     },
     {
       "id": "sayari-forward-deployed-engineer-ce-london",
@@ -2974,7 +3104,13 @@
       "sources": [
         "https://job-boards.greenhouse.io/sayari/jobs/4053424009"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London forward-deployed engineer (FDE) role embeds you with clients, and your Python and SQL skills fit it well. Being London-based means no visa issue.",
+      "watch_outs": [
+        "The listing could not be confirmed, so check the job is still open.",
+        "It asks for 5+ years facing clients; you have about 5 years of delivery, 3+ directly with clients.",
+        "Travel could be up to 50% of your time, and none of the named contacts are confirmed."
+      ]
     },
     {
       "id": "sierra-deployed-infrastructure-engineer",
@@ -3102,7 +3238,13 @@
         "https://github.com/rasulshaikh/lumen-fde/blob/main/reports/market/index.json",
         "https://jobs.ashbyhq.com/sierra/61bb1eca-b416-4e6d-a0ac-5f418b35a8f3"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "Sierra is a well-funded AI agent company with confirmed London contacts, and being London-based means no visa issue. Its London agent engineering roles may suit you better than this one.",
+      "watch_outs": [
+        "This role is infrastructure-heavy (Kubernetes, air-gapped systems, Terraform), outside your stack.",
+        "Sierra has a high hiring bar, and the remote policy is unknown.",
+        "Consider its London 'Software Engineer, Agent' roles, which are closer to forward-deployed work."
+      ]
     },
     {
       "id": "n8n-forward-deployed-engineer-emea",
@@ -3230,7 +3372,13 @@
         "https://n8n.io/careers/",
         "https://jobs.ashbyhq.com/n8n/c9fc97fa-a473-4133-b3cb-502785649ecd"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "As forward-deployed engineer (FDE), you would build AI workflows and connectors on n8n itself, and you already ship production n8n pipelines with HubSpot, Slack and Claude. It is remote, UK included.",
+      "watch_outs": [
+        "As the founding FDE for the region, you may need more autonomy than your 1.5 years in AI suggests.",
+        "There is no FDE lead yet, and it is unclear whether the VP of Sales is the hiring manager.",
+        "The job was last seen on another site on 27 September, so confirm it on n8n's own page."
+      ]
     },
     {
       "id": "apollo-research-forward-deployed-engineer-product",
@@ -3351,7 +3499,13 @@
       "sources": [
         "https://jobs.lever.co/apolloresearch/2237ce81-cb8e-4f53-a047-e12ea5d6e7d8"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London forward-deployed engineer (FDE) role deploys Watcher for coding agents, which overlaps closely with your role-based access control and audit work.",
+      "watch_outs": [
+        "The listing could not be confirmed and has no known close date, so check it is still open.",
+        "The £149k to £195k pay band points to a senior bar, and no recruiter is named.",
+        "It is fully on-site in London, and you have no AI-safety research background."
+      ]
     },
     {
       "id": "arondite-deployed-ai-engineer",
@@ -3448,7 +3602,13 @@
       "sources": [
         "https://www.indexventures.com/startup-jobs/arondite/deployed-ai-engineer/"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This on-site deployed AI engineer role is in London, where you are based, and the CEO and two engineers are confirmed as contacts.",
+      "watch_outs": [
+        "Its closing date of 21 August has passed, so it is likely closed; check it is still open.",
+        "It focuses on edge and perception deep learning, which you have not worked on.",
+        "Defence work likely needs UK security clearance, plus regular client-site and overseas travel."
+      ]
     },
     {
       "id": "arva-ai-forward-deployed-engineer",
@@ -3546,7 +3706,13 @@
         "https://www.workatastartup.com/companies/arva-ai",
         "https://www.workatastartup.com/jobs/89530"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "As forward-deployed engineer (FDE), you would own bank and fintech pilots end to end in Central London, and its agentic compliance work suits your gated-autonomy and audit-log experience.",
+      "watch_outs": [
+        "The listing could not be confirmed, so check the job is still open before applying.",
+        "Expect 4 to 5 days a week in the Central London office.",
+        "It is a team of about 14 with a single FDE role, not an established FDE team."
+      ]
     },
     {
       "id": "barings-forward-deployed-ai-engineer",
@@ -3643,7 +3809,13 @@
       "sources": [
         "https://www.welcometothejungle.com/en/companies/barings/jobs/forward-deployed-ai-engineer_london_5e7ykscw"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London forward-deployed AI engineer role builds agentic workflows on Copilot and Foundry, and your Azure certification and n8n experience fit it well.",
+      "watch_outs": [
+        "A closing date of 15 October is unconfirmed, so apply soon.",
+        "The remote policy is unclear and may mean working in the London office.",
+        "Your customers would be internal teams, seniority is not stated, and only a recruiter is confirmed."
+      ]
     },
     {
       "id": "commerceiq-forward-deployed-engineer-london",
@@ -3740,7 +3912,13 @@
       "sources": [
         "https://startup.jobs/forward-deployed-engineer-london-commerceiq-7572530"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This founding London forward-deployed engineer (FDE) role builds Ally skills with human-in-the-loop approval and AI-written summaries, which closely match your own work.",
+      "watch_outs": [
+        "The listing could not be confirmed, so check the job is still open.",
+        "It is on-site in London with about 50% client travel.",
+        "The 'founding' title may expect more seniority, and the hiring manager is not named."
+      ]
     },
     {
       "id": "edra-forward-deployed-ai-engineer-london",
@@ -3825,7 +4003,13 @@
       "sources": [
         "https://builtin.com/job/forward-deployed-ai-engineer-london/10255349"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London forward-deployed AI engineer role at Sequoia-backed Edra builds knowledge-base agents with evaluations, which fits your work.",
+      "watch_outs": [
+        "Posted on 20 July and missing from a later check on 23 September, so check it is still open.",
+        "It asks for 3+ years of experience and is on-site 5 days a week in Holborn.",
+        "The founders' email addresses are unconfirmed guesses, and no LinkedIn profiles are known."
+      ]
     },
     {
       "id": "encord-forward-deployed-engineer-london",
@@ -3947,7 +4131,13 @@
         "https://www.workatastartup.com/jobs/92688",
         "https://jobs.lever.co/CordTechnologies/2e207b48-9076-4e27-bc1a-36c7290c5dfe"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London hybrid forward-deployed engineer (FDE) role embeds you with customers at well-funded Encord, and its founders are confirmed as contacts.",
+      "watch_outs": [
+        "The listing could not be confirmed and may not have been seen since 28 May, so check it is open.",
+        "The $150k to $250k pay band suggests they want experienced hires.",
+        "Vision and multimodal data are outside your experience, which is mainly language models."
+      ]
     },
     {
       "id": "faculty-lead-forward-deployed-engineer",
@@ -4069,7 +4259,13 @@
         "https://www.glassdoor.co.uk/job-listing/lead-forward-deployed-engineer-faculty-ai-JV_IC2671300_KO0,30_KE31,41.htm?jl=1010136134229",
         "https://builtinlondon.uk/job/lead-forward-deployed-engineer/9386399"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "Faculty does real forward-deployed engineer (FDE) work in London, and its NHS and government projects match your dissertation.",
+      "watch_outs": [
+        "This is a Lead role covering roadmaps and hiring, so ask about the standard FDE level instead.",
+        "The listing could not be checked, so confirm the job is still open.",
+        "Its national security unit may need UK security clearance."
+      ]
     },
     {
       "id": "gwi-forward-deployed-engineer",
@@ -4191,7 +4387,13 @@
         "https://www.welcometothejungle.com/en/companies/gwi/jobs/forward-deployed-engineer_london_lqnzbyer",
         "https://job-boards.greenhouse.io/globalwebindex/jobs/8551838002"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This London forward-deployed engineer (FDE) role builds AI for customers using Spark and the Model Context Protocol (MCP), which is close to your work building tools for Claude.",
+      "watch_outs": [
+        "The listing could not be confirmed, so check the job is still open.",
+        "Seniority and office or hybrid terms are not stated.",
+        "Only an engineering director is confirmed, there is no recruiter, and AI leaders are in Athens."
+      ]
     },
     {
       "id": "infinit-forward-deployed-engineer",
@@ -4251,7 +4453,13 @@
         "https://uk.linkedin.com/jobs/view/forward-deployed-engineer-at-infinit-4340942062",
         "https://jobs.lever.co/infinit/fbd54961-0f9d-48ca-8009-65b71b44e176/apply"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "The title is forward-deployed engineer (FDE) in London, where you are based, but with no job description seen the fit cannot yet be confirmed.",
+      "watch_outs": [
+        "The listing could not be confirmed, so check the job is still open.",
+        "Confirm which INFINIT this is, as it may be a decentralised finance firm, not an AI startup.",
+        "No contacts, seniority, tech stack or remote terms are known."
+      ]
     },
     {
       "id": "lovable-forward-deployed-engineer",
@@ -4373,7 +4581,13 @@
         "https://lovable.dev/careers/forward-deployed-engineer-7fe392",
         "https://jobs.ashbyhq.com/lovable/7fe39289-1f7f-47d4-8002-d3aeeaaaabc6"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This founding forward-deployed engineer (FDE) role at a fast-growing AI app builder uses React and Supabase, a stack close to your own.",
+      "watch_outs": [
+        "The listing could not be re-checked, so make sure the job is still open.",
+        "It is likely based in Stockholm, with no London office found, and remote policy is unknown.",
+        "A founding role may lean senior for your 1.5 years of AI engineering."
+      ]
     },
     {
       "id": "meticulous-forward-deployed-engineer-london",
@@ -4482,7 +4696,13 @@
       "sources": [
         "https://jobs.ashbyhq.com/meticulous/9b592dc5-6262-42ff-bbd7-f1b2ae8e7543"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This on-site London forward-deployed engineer (FDE) role is at a Series A developer tools company backed by Y Combinator, and the CEO's LinkedIn profile is confirmed.",
+      "watch_outs": [
+        "The listing could not be re-checked, so check the job is still open.",
+        "It appears to be a Senior role (£150k to £300k) needing browser internals and distributed systems.",
+        "The new-graduate London role may be closed, and expect about 25% travel."
+      ]
     },
     {
       "id": "perplexity-member-of-technical-staff-forward-deployed-engineer-applied-ai",
@@ -4592,7 +4812,13 @@
         "https://job-boards.greenhouse.io/perplexityai/jobs/4829944007",
         "https://jobs.ashbyhq.com/Perplexity/aa511ea8-96e3-42ba-b28f-5e222170bcee"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "This is a real forward-deployed engineer (FDE) role on agentic and API integrations, which suits your stack.",
+      "watch_outs": [
+        "The listing could not be confirmed and its job links disagree, so check it is still open.",
+        "It is based in New York or San Francisco, so you need a US visa unless the London option is real.",
+        "No hiring contact is named, the title may expect more seniority, and there is a 1-hour coding test."
+      ]
     },
     {
       "id": "polyai-forward-deployed-engineer-must-be-based-in-uk",
@@ -4714,7 +4940,13 @@
         "https://builtinlondon.uk/job/forward-deployed-engineer-must-be-based-uk/7004222",
         "https://uk.linkedin.com/jobs/view/forward-deployed-engineer-must-be-based-in-uk-at-polyai-4292674071"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A forward-deployed engineer (FDE) role in an established deployments team at a London voice-AI company. Your Python and integration work fits well, and it must be UK-based, which suits you.",
+      "watch_outs": [
+        "Check the job is still open, as it has not been seen recently.",
+        "You have no telephony (SIP/RTP) or Kubernetes experience, which is a gap here.",
+        "The remote policy is unknown, so ask how much time is spent in the office."
+      ]
     },
     {
       "id": "seamflow-forward-deployed-engineer",
@@ -4811,7 +5043,13 @@
       "sources": [
         "https://jobs.ashbyhq.com/seamflow/83e5dd13-b293-462f-9cb6-bc9cc325b155"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "An office-based London FDE role at a small seed-funded startup that already has revenue. Your work with Python, LLM SDKs, evaluations and TypeScript/React maps closely onto it.",
+      "watch_outs": [
+        "Check the job is still open and read the full advert, which has not been reviewed yet.",
+        "With about 8 staff, the team is tiny and the FDE role is still new.",
+        "You have no medical-device or TIC domain experience."
+      ]
     },
     {
       "id": "shield-ai-forward-deployed-engineer",
@@ -4932,7 +5170,13 @@
       "sources": [
         "https://jobs.lever.co/shieldai/7d6a8fe1-66eb-4771-9e1d-0182490d0cd5"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A genuine London FDE role at a well-funded company, with Python in the work. The mid-level FDE II opening is your realistic target rather than the main Staff-level role.",
+      "watch_outs": [
+        "Check the job is still open, as it has not been seen recently.",
+        "The work uses C++, which you lack, and involves about 30% travel.",
+        "This is defence work, so there may be nationality or security clearance checks."
+      ]
     },
     {
       "id": "simudyne-forward-deployed-engineer-london-or-remote-uk-eu-us",
@@ -5053,7 +5297,13 @@
       "sources": [
         "https://jobs.techstars.com/companies/simudyne/jobs/70291384-forward-deployed-engineer-london-or-remote-uk-eu-us"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A clear FDE role you can do from London or remotely in the UK. Its Python SDK and finance-risk modelling work overlaps with your experience.",
+      "watch_outs": [
+        "Check the job is still open, as it was only seen once and not recently.",
+        "It is a small startup and the seniority and scope of the role are unknown.",
+        "You have no capital-markets or agent-based modelling experience."
+      ]
     },
     {
       "id": "smartcat-forward-deployed-engineer-emea",
@@ -5151,7 +5401,13 @@
         "https://startup.jobs/roles/forward-deployed-engineer",
         "https://freehire.me/jobs/forward-deployed-engineer-emea-smartcat-2funyku6"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A remote FDE role covering Europe, the Middle East and Africa that you can do from London. It is a strong match for your stack: AI workflows, prompts, agent skills and integrations.",
+      "watch_outs": [
+        "Check the job is still open, as it has not been seen recently.",
+        "The advert asks for 10+ years of experience, so expect questions on seniority.",
+        "No contact there has a confirmed job title yet."
+      ]
     },
     {
       "id": "speechmatics-forward-deployed-engineer",
@@ -5261,7 +5517,13 @@
         "https://uk.linkedin.com/jobs/view/forward-deployed-engineer-at-speechmatics-4289273550",
         "https://job-boards.greenhouse.io/speechmatics/jobs/4792165101"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A clear FDE role in London or Cambridge with no senior-level requirement, built around TypeScript/React API work. As you are in London, there is no visa issue.",
+      "watch_outs": [
+        "It was last seen in April or May 2026, so check the job is still open.",
+        "You have no speech or voice experience to point to.",
+        "The remote policy is unknown and the recruiter contact needs checking first."
+      ]
     },
     {
       "id": "twilio-forward-deployed-engineer",
@@ -5370,7 +5632,13 @@
       "sources": [
         "https://job-boards.greenhouse.io/twilio/jobs/8060160"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A real FDE role you could do remotely from London, doing Python and TypeScript LLM work with customers.",
+      "watch_outs": [
+        "The 10 August 2026 deadline has passed, so check it is still open or has been reposted.",
+        "It asks for 5+ years and confidence with senior executives, which is a stretch.",
+        "Camelia Suciu, Solutions Engineering Director for EMEA, is the only useful verified contact."
+      ]
     },
     {
       "id": "v7-forward-deployed-engineer",
@@ -5491,7 +5759,13 @@
       "sources": [
         "https://www.welcometothejungle.com/en/companies/v7/jobs/forward-deployed-engineer_london_jycxq3mj"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A London FDE role putting V7 Go agents into enterprise workflows using a Python SDK and MCP, which is a strong match for your stack.",
+      "watch_outs": [
+        "Check the job is still open, as it has no posting date and has not been seen recently.",
+        "The remote policy and seniority are not stated.",
+        "Only the CEO and one engineer, Chris Gregori, are verified contacts."
+      ]
     },
     {
       "id": "writer-ai-deployment-engineer-uk",
@@ -5613,7 +5887,13 @@
         "https://github.com/rasulshaikh/lumen-fde/blob/main/reports/market/index.json",
         "https://jobs.ashbyhq.com/writer/6e892a8a-8f81-43db-bf47-6c6e1ded2523"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "Writer's name for an FDE role, based in London on a hybrid basis, at a $1.9B platform with an established deployment team for you to join.",
+      "watch_outs": [
+        "Check the job is still open, as a recent repost has not been confirmed.",
+        "Sponsorship was flagged, so confirm the right-to-work requirements.",
+        "Seniority is not stated, and only the CTO's title is verified."
+      ]
     },
     {
       "id": "yld-contract-forward-deployed-engineer",
@@ -5722,7 +6002,13 @@
       "sources": [
         "https://job-boards.greenhouse.io/yld/jobs/4845729101"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A contract FDE role working inside client teams at a remote-first London consultancy, doing LLM work for banking and fintech.",
+      "watch_outs": [
+        "Check the job is still open, as it has not been seen recently.",
+        "It is a contract, not a permanent job, so check IR35 status and the day rate.",
+        "There is no recruiter contact and the email format is unconfirmed."
+      ]
     },
     {
       "id": "stability-ai-forward-deployed-engineer",
@@ -5838,7 +6124,13 @@
         "https://zapply.jobs/jobs/044b7d90-abed-4dd5-b22d-55dd6cb44004/",
         "https://himalayas.app/companies/stability-ai/jobs/forward-deployed-engineer"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A genuine FDE role at a London-headquartered lab with a funded Solutions team. The London base gives you an opening to ask about a UK route.",
+      "watch_outs": [
+        "The role is currently remote for the US only, so ask about a UK route via London.",
+        "The work is generative media rather than LLM agents.",
+        "It appears only on third-party job sites, not on Stability AI's own careers page."
+      ]
     },
     {
       "id": "cloudera-forward-deployed-ai-engineer",
@@ -5960,7 +6252,13 @@
         "https://github.com/alexeygrigorev/ai-engineering-field-guide/blob/main/job-market/_internal/data/scrapes/2026-09-23/all_jobs_dedup.csv",
         "https://builtin.com/job/forward-deployed-ai-engineer/10843678"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "Cloudera has a genuine FDE team with a named, verified head, but this role is a weak fit for you on location and seniority.",
+      "watch_outs": [
+        "It asks for 7+ years at Senior or Director level, against your 1.5 years in AI.",
+        "The main role is remote from India, and the nearest European option is remote in Austria.",
+        "There is no UK role, and the company had layoffs in May 2026."
+      ]
     },
     {
       "id": "nebius-forward-deployed-engineer-physical-ai",
@@ -6082,7 +6380,13 @@
         "https://github.com/alexeygrigorev/ai-engineering-field-guide/blob/main/job-market/_internal/data/scrapes/2026-09-23/all_jobs_dedup.csv",
         "https://builtin.com/job/forward-deployed-engineer-physical-ai/11226765"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "Nebius has an established FDE team and a named Field CTO, but this Physical AI role centres on robotics and GPU infrastructure, outside your stack.",
+      "watch_outs": [
+        "You have no robotics, Slurm or Kubernetes GPU experience.",
+        "The advert favours US remote (SF Bay or Austin), so UK eligibility is uncertain.",
+        "Confirm which track this is, as their Platform and Product role may suit you better."
+      ]
     },
     {
       "id": "akka-lightbend-forward-deployed-engineer-europe",
@@ -6203,7 +6507,13 @@
       "sources": [
         "https://lightbend.applytojob.com/apply/78DmzAw9p6/Forward-Deployed-Engineer-Europe"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A genuine FDE role working inside customer teams to ship agentic systems, remote across Europe, at a company with a documented way of running FDE work.",
+      "watch_outs": [
+        "Check the job is still open, as it has not been re-checked recently.",
+        "Confirm that UK residents can apply for this Europe-remote role.",
+        "Akka's SDK is JVM-based, while you work in Python, TypeScript and C#."
+      ]
     },
     {
       "id": "albatross-ai-forward-deployed-engineer-go-to-market-team",
@@ -6324,7 +6634,13 @@
       "sources": [
         "https://www.eu-startups.com/job/forward-deployed-engineer"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A real FDE role on the go-to-market team that is friendly to early-career candidates, and it is remote across Europe.",
+      "watch_outs": [
+        "It was last seen about 45 days ago, so check the job is still open.",
+        "UK eligibility is unconfirmed, and pay of EUR 50-60k is low for London.",
+        "The work is recommendation systems and search, which is new to you."
+      ]
     },
     {
       "id": "remote-remote-com-senior-forward-deployed-engineer-remote-build",
@@ -6421,7 +6737,13 @@
       "sources": [
         "https://remote.com/openings/7774935003"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "A fully remote FDE role building integrations and agentic workflows, which is a near-exact match for your stack.",
+      "watch_outs": [
+        "This is a Senior role, so expect questions about your years of experience.",
+        "UK eligibility is not confirmed, though the company does hire in the UK.",
+        "There is no named FDE lead or recruiter, and only the founders are verified."
+      ]
     },
     {
       "id": "runpod-forward-deployed-engineer-emea",
@@ -6543,7 +6865,13 @@
         "https://startup.jobs/company/runpod",
         "https://job-boards.greenhouse.io/runpod/jobs/5082425008"
       ],
-      "last_verified": "2026-10-01"
+      "last_verified": "2026-10-01",
+      "fit_summary": "Runpod has an established FDE team with roles in the US and Asia-Pacific, and this role is remote across Europe.",
+      "watch_outs": [
+        "The Europe advert may be an old one from around January 2026, so check it is still open.",
+        "It asks for 3+ years, and GPU serving work is new ground for you.",
+        "UK eligibility is likely but not confirmed."
+      ]
     }
   ]
 }
