@@ -27,6 +27,10 @@ Pushing to this repo only runs **Validate data** (`.github/workflows/ci.yml`), w
 - **Use it privately (recommended)**: clone the repo and open `index.html` in a browser.
 - **GitHub Pages**: run **Deploy to GitHub Pages** by hand from the Actions tab. Pages needs a public repo or a paid plan, and the site it creates is public.
 - **Netlify**: `netlify.toml` is included. Connect the repo and turn on password protection before sharing the link.
+- **As a private Claude page**: `node scripts/build-artifact.mjs` writes `dist/opportunity-hunter.html`, one file with the styles, data and app inlined, ready to publish as a claude.ai artifact (with the `db`, `user` and `downloads` capabilities). Only you can open it unless you share it. On that page:
+  - progress, notes, edits and your details are also saved to your own private space in the artifact, so they follow you to other devices;
+  - email defaults to Gmail in the browser, because email-app (`mailto:`) links often don't open from a Claude page;
+  - CSV and backup files go through Claude's save prompt.
 
 ## How the one-click actions work
 

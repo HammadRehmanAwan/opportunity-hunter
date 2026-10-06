@@ -1,6 +1,7 @@
 /* Opportunity Hunter: client-side app. No build step, no server, no tracking.
    Data comes from data/opportunities.js (generated from data/opportunities.json).
-   Progress, notes, edited messages and your details live in localStorage. */
+   Progress, notes, edited messages and your details live in localStorage. Opened as a claude.ai
+   artifact, they are also saved to the viewer's own private space in the artifact's db. */
 (() => {
   'use strict';
 
@@ -21,16 +22,23 @@
   const load = (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode etc. */ } };
   const plain = (o) => Object.assign(Object.create(null), o && typeof o === 'object' ? o : {});
+  const asObj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+
+  // Set when the page is open inside the claude.ai artifact viewer.
+  const HOST = window.claude && typeof window.claude.use === 'function' ? window.claude : null;
 
   const DEFAULT_PROFILE = Object.assign({
     name: 'Your name', email: 'you@example.com', phone: '', linkedin: '', cv_url: '', headline: '',
     mail_client: 'mailto', signature: '',
   }, window.OH_PROFILE || {});
+  // mailto: links often do nothing inside the artifact viewer, so default to Gmail there.
+  if (HOST && DEFAULT_PROFILE.mail_client === 'mailto') DEFAULT_PROFILE.mail_client = 'gmail';
 
   let DATA = Array.isArray(window.OH_DATA) ? window.OH_DATA : [];
   let META = window.OH_META || {};
   let tracker = plain(load(KEYS.tracker, {}));
-  let profile = Object.assign({}, DEFAULT_PROFILE, load(KEYS.profile, {}));
+  let savedProfile = asObj(load(KEYS.profile, {}));
+  let profile = Object.assign({}, DEFAULT_PROFILE, savedProfile);
   let filters = Object.assign({}, DEFAULT_FILTERS, load(KEYS.filters, {}));
 
   // ---------- helpers ----------
@@ -77,7 +85,8 @@
     if (!Object.hasOwn(tracker, id)) tracker[id] = { status: 'new', notes: '', drafts: {}, contact: 0 };
     const s = tracker[id]; if (!s.drafts || typeof s.drafts !== 'object') s.drafts = {}; return s;
   }
-  function persist() { save(KEYS.tracker, tracker); }
+  function persist() { save(KEYS.tracker, tracker); scheduleSync(); }
+  function saveProfile(p) { savedProfile = asObj(p); save(KEYS.profile, savedProfile); scheduleSync(); }
 
   // The address to use for a contact: their published work email, else a likely one, else the careers inbox.
   function contactEmail(o, c) {
@@ -121,15 +130,20 @@
   }
   const sendLabel = () => ({ gmail: 'Open in Gmail', outlook: 'Open in Outlook' }[profile.mail_client] || 'Open in your email app');
 
-  // Navigation seam: tests (or a host page) can set window.OH_NAV(url, newTab) to observe navigations.
-  const go = (url, newTab) => { if (typeof window.OH_NAV === 'function') return window.OH_NAV(url, newTab); if (newTab) window.open(url, '_blank', 'noopener'); else window.location.href = url; };
+  // The send and LinkedIn actions are real links (the artifact viewer only opens real links),
+  // so their href is kept up to date as the message and recipient change.
+  function linkTo(a, url) {
+    a.href = url;
+    if (isHttp(url)) { a.target = '_blank'; a.rel = 'noopener'; } else { a.removeAttribute('target'); a.removeAttribute('rel'); }
+  }
 
   // ---------- theme ----------
   function effectiveTheme() { return document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); }
   function applyTheme(t) {
-    if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
     const b = $('#btn-theme'); if (b) { const eff = effectiveTheme(); b.setAttribute('aria-label', eff === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'); b.setAttribute('aria-pressed', String(eff === 'dark')); }
   }
+  // With no saved choice, leave data-theme alone so the system (or the artifact viewer) decides.
   applyTheme(load(KEYS.theme, null));
   $('#btn-theme').addEventListener('click', () => { const next = effectiveTheme() === 'dark' ? 'light' : 'dark'; applyTheme(next); save(KEYS.theme, next); });
 
@@ -381,7 +395,11 @@
       $('.composer-title', el).textContent = c ? `Write to ${c.name}` : (pick.value === 'careers' ? `Write to ${o.company}'s careers inbox` : `Write to ${o.company}`);
       label.textContent = c ? `Write to ${firstName(c.name)}` : 'Write a message';
       $('.send-label', el).textContent = sendLabel();
+      syncSendLink();
+      const li = c && isHttp(c.linkedin_url) ? c.linkedin_url : peopleSearchUrl(o);
+      $$('.act-linkedin', el).forEach((a) => linkTo(a, li));
     }
+    function syncSendLink() { linkTo($('.act-send', el), mailLink(recipient().email, subj.value, body.value)); }
     function loadDrafts() {
       const c = current(); const k = key(); let anyEdited = false;
       Object.entries(fields).forEach(([f, input]) => { const d = draft(o, k, f); input.value = d.edited ? d.text : fill(d.text, o, c); anyEdited = anyEdited || d.edited; });
@@ -393,26 +411,28 @@
     pick.onchange = () => { s.contact = pick.value === 'careers' ? 'careers' : (pick.value === 'none' ? 0 : Number(pick.value)); persist(); loadDrafts(); };
 
     // Editing stores the edited text for this role + this person only.
-    Object.entries(fields).forEach(([f, input]) => { input.oninput = () => { const k = key(); s.drafts[k] = s.drafts[k] || {}; s.drafts[k][f] = input.value; persist(); $$('.act-reset', el).forEach((b) => { b.hidden = false; }); }; });
+    Object.entries(fields).forEach(([f, input]) => { input.oninput = () => { const k = key(); s.drafts[k] = s.drafts[k] || {}; s.drafts[k][f] = input.value; persist(); $$('.act-reset', el).forEach((b) => { b.hidden = false; }); if (input === subj || input === body) syncSendLink(); }; });
     notes.oninput = () => { s.notes = notes.value; persist(); };
 
     $$('.act-reset', el).forEach((b) => { b.onclick = () => { const f = b.dataset.field; const k = key(); const d = s.drafts[k] || {}; if (f === 'email') { delete d.email_subject; delete d.email_body; } else if (f === 'note') delete d.linkedin_note; else delete d.linkedin_inmail; if (!Object.keys(d).length) delete s.drafts[k]; persist(); loadDrafts(); toast('Back to the original message'); }; });
 
     const markContacted = (via) => { if (s.status === 'new' || s.status === 'shortlisted') { s.status = 'contacted'; el.dataset.status = 'contacted'; $('.status', el).value = 'contacted'; } if (!s.contacted_at) s.contacted_at = nowIso(); if (!s.contacted_via) s.contacted_via = via; persist(); renderSummary(); renderContactedLine(o, el); };
 
+    // The link itself opens the email; the click only records progress.
     $('.act-send', el).onclick = () => {
       const r = recipient();
-      go(mailLink(r.email, subj.value, body.value), profile.mail_client !== 'mailto');
-      markContacted('email'); toast(r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.');
+      markContacted('email');
+      if (HOST && !isHttp(mailLink('', '', ''))) toast('Marked as contacted. If no email opened, use Copy, or choose Gmail or Outlook in Your details.');
+      else toast(r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.');
     };
     $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); toast(ok ? 'Email copied' : 'Copy failed. Select the text and copy it yourself.'); };
-    $$('.act-linkedin', el).forEach((b) => { b.onclick = async () => {
+    // The link opens LinkedIn; the click copies the message (inside the click, so the clipboard allows it).
+    $$('.act-linkedin', el).forEach((b) => { b.onclick = () => {
       const c = current(); const text = b.dataset.kind === 'note' ? note.value : inmail.value;
-      const ok = await copyText(text);
       const hasProfile = c && isHttp(c.linkedin_url);
-      go(hasProfile ? c.linkedin_url : peopleSearchUrl(o), true);
+      const copied = copyText(text);
       markContacted('linkedin');
-      toast(ok ? (hasProfile ? `Copied. Paste it on ${firstName(c.name)}'s LinkedIn profile.` : 'Copied. No profile link, so LinkedIn search opened.') : 'Copy failed, but LinkedIn opened.');
+      copied.then((ok) => toast(ok ? (hasProfile ? `Copied. Paste it on ${firstName(c.name)}'s LinkedIn profile.` : 'Copied. No profile link, so LinkedIn search opened.') : 'Copy failed, but LinkedIn opened.'));
     }; });
 
     loadDrafts();
@@ -441,32 +461,98 @@
     if (!f.length) return; const first = f[0], last = f[f.length - 1];
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
-  form.addEventListener('submit', (e) => { e.preventDefault(); const fd = new FormData(form); profile = Object.assign({}, DEFAULT_PROFILE, Object.fromEntries(fd.entries())); save(KEYS.profile, profile); closeDrawer(); renderList(); toast('Saved. Messages you haven\'t edited now use these details.'); });
-  $('#btn-profile-reset').addEventListener('click', () => { profile = Object.assign({}, DEFAULT_PROFILE); save(KEYS.profile, {}); fillForm(); renderList(); toast('Back to the default details'); });
+  form.addEventListener('submit', (e) => { e.preventDefault(); const fd = new FormData(form); profile = Object.assign({}, DEFAULT_PROFILE, Object.fromEntries(fd.entries())); saveProfile(profile); closeDrawer(); renderList(); toast('Saved. Messages you haven\'t edited now use these details.'); });
+  $('#btn-profile-reset').addEventListener('click', () => { profile = Object.assign({}, DEFAULT_PROFILE); saveProfile({}); fillForm(); renderList(); toast('Back to the default details'); });
 
-  $('#btn-backup').addEventListener('click', () => download('opportunity-hunter-backup.json', JSON.stringify({ tracker, profile, exported_at: nowIso() }, null, 2), 'application/json'));
+  $('#btn-backup').addEventListener('click', async () => { if (await download('opportunity-hunter-backup.json', JSON.stringify({ tracker, profile, exported_at: nowIso() }, null, 2), 'application/json')) toast('Backup saved'); });
   $('#file-restore').addEventListener('change', async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { const j = JSON.parse(await f.text()); if (j.tracker && typeof j.tracker === 'object') tracker = plain(j.tracker); if (j.profile) profile = Object.assign({}, DEFAULT_PROFILE, j.profile); save(KEYS.tracker, tracker); save(KEYS.profile, profile); fillForm(); renderSummary(); renderList(); toast('Backup restored'); }
+    try { const j = JSON.parse(await f.text()); if (j.tracker && typeof j.tracker === 'object') tracker = plain(j.tracker); if (j.profile) profile = Object.assign({}, DEFAULT_PROFILE, j.profile); persist(); saveProfile(profile); fillForm(); renderSummary(); renderList(); toast('Backup restored'); }
     catch (err) { toast('That file could not be read'); }
     e.target.value = '';
   });
-  $('#btn-wipe').addEventListener('click', () => { if (confirm('Clear all progress, notes and edited messages in this browser?')) { tracker = plain({}); save(KEYS.tracker, tracker); renderSummary(); renderList(); toast('Cleared'); } });
+  // Two clicks instead of confirm(), which the artifact viewer blocks.
+  const wipe = $('#btn-wipe'); const wipeLabel = wipe.textContent;
+  const disarmWipe = () => { clearTimeout(wipe._t); delete wipe.dataset.armed; wipe.textContent = wipeLabel; };
+  wipe.addEventListener('click', () => {
+    if (wipe.dataset.armed !== '1') { wipe.dataset.armed = '1'; wipe.textContent = 'Click again to clear everything'; clearTimeout(wipe._t); wipe._t = setTimeout(disarmWipe, 5000); return; }
+    disarmWipe(); tracker = plain({}); persist(); renderSummary(); renderList(); toast('Cleared');
+  });
 
   // ---------- export ----------
   function csvCell(v) { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
-  function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
-  const exportCsv = () => {
+  // In the artifact viewer a page can't start a download itself, so files go through its save prompt.
+  const downloads = HOST ? HOST.use('downloads').catch(() => null) : null;
+  async function download(name, text, type) {
+    if (!HOST) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); return true; }
+    const dl = await downloads;
+    if (!dl) { toast('Saving files isn\'t available here.'); return false; }
+    try { await dl.save({ filename: name, data: text }); return true; }
+    catch (e) { if (!e || e.code !== 'declined') toast(e && e.code === 'rate_limited' ? 'A save is already waiting for you. Answer it first.' : 'The file could not be saved.'); return false; }
+  }
+  const exportCsv = async () => {
     const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
     const rows = [head.join(',')];
     visible().forEach((o) => {
       const s = state(o.id); const cs = (o.contacts && o.contacts.length) ? o.contacts : [{}];
       cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, c.name, c.title, c.role_type, c.verified === true ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
     });
-    download('opportunity-hunter.csv', rows.join('\n'), 'text/csv'); toast(`Downloaded ${rows.length - 1} rows`);
+    if (await download('opportunity-hunter.csv', rows.join('\n'), 'text/csv')) toast(`Saved ${rows.length - 1} rows as CSV`);
   };
   $('#btn-export').addEventListener('click', exportCsv);
   $('#btn-export-2').addEventListener('click', exportCsv);
+
+  // ---------- saved to your Claude account (only inside the artifact viewer) ----------
+  // Each viewer's copy lives under data/users/<their id>/, which nobody else can read.
+  // One document per role ("t-<id>") plus "profile"; local storage stays as the fast, offline copy.
+  const SEG = /^[A-Za-z0-9_\-.~:@+]{1,180}$/;
+  const sync = { col: null, last: Object.create(null), timer: 0, running: false, again: false, warned: false };
+  // Rendering a card creates a blank entry for it; only roles the person has touched are saved.
+  const untouched = (s) => !s || ((s.status || 'new') === 'new' && !s.notes && !s.contacted_at && !s.contact && !(s.drafts && Object.keys(s.drafts).length));
+  function scheduleSync() { if (!sync.col) return; clearTimeout(sync.timer); sync.timer = setTimeout(flushSync, 800); }
+  async function flushSync() {
+    if (sync.running) { sync.again = true; return; }
+    sync.running = true;
+    try {
+      const want = Object.create(null);
+      Object.keys(tracker).forEach((id) => { if (SEG.test(id) && !untouched(tracker[id])) want[`t-${id}`] = JSON.stringify(tracker[id]); });
+      if (Object.keys(savedProfile).length) want.profile = JSON.stringify(savedProfile);
+      // Writes go one at a time, and only for documents that changed since the last write.
+      for (const name of new Set([...Object.keys(want), ...Object.keys(sync.last)])) {
+        const json = want[name] || null;
+        if (json === (sync.last[name] || null)) continue;
+        const ref = sync.col.doc(name);
+        if (json) { await ref.set(JSON.parse(json)); sync.last[name] = json; } else { await ref.delete(); delete sync.last[name]; }
+      }
+    } catch (e) {
+      if (!sync.warned) { sync.warned = true; toast(e && e.code === 'quota_exceeded' ? 'Your account storage for this page is full. Progress is still saved in this browser.' : 'Couldn\'t save to your account just now. Progress is still saved in this browser.'); }
+    } finally {
+      sync.running = false;
+      if (sync.again) { sync.again = false; scheduleSync(); }
+    }
+  }
+  async function connectAccount() {
+    if (!HOST) return;
+    try {
+      const [db, user] = await Promise.all([HOST.use('db'), HOST.use('user')]);
+      const uid = db && user ? await user.id() : null;
+      if (!uid) return;
+      const col = db.collection(`data/users/${uid}`);
+      const snap = await col.get();
+      let changed = false;
+      // What's saved in the account wins; anything only this browser has is uploaded below.
+      snap.docs.forEach((d) => {
+        const body = d.exists ? d.data() : null; if (!body) return;
+        const json = JSON.stringify(body);
+        if (d.id === 'profile') { sync.last.profile = json; savedProfile = asObj(JSON.parse(json)); profile = Object.assign({}, DEFAULT_PROFILE, savedProfile); save(KEYS.profile, savedProfile); changed = true; }
+        else if (d.id.startsWith('t-')) { sync.last[d.id] = json; tracker[d.id.slice(2)] = JSON.parse(json); changed = true; }
+      });
+      sync.col = col;
+      if (changed) { save(KEYS.tracker, tracker); renderSummary(); renderList(); }
+      $$('.saved-where').forEach((n) => { n.textContent = 'to your Claude account and this browser'; });
+      scheduleSync();
+    } catch (e) { /* keep using this browser's storage */ }
+  }
 
   // ---------- boot ----------
   async function boot() {
@@ -476,6 +562,7 @@
     DATA = DATA.filter((o) => o && typeof o === 'object' && o.company);
     DATA.forEach((o) => { if (!o.id) o.id = slug(`${o.company} ${o.role_title || ''}`); });
     bindFilters(); renderSummary(); renderList();
+    connectAccount();
   }
   boot();
 })();

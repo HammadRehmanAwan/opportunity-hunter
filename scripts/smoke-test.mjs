@@ -43,7 +43,12 @@ await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 const fails = [];
 const check = (cond, msg) => { if (!cond) fails.push(msg); else console.log('  ok  ' + msg); };
 
-await page.addInitScript(() => { window.__nav = []; window.OH_NAV = (u) => { window.__nav.push(u); }; });
+// The send and LinkedIn actions are real links: record where they point and keep the test page in place.
+const recordLinks = () => {
+  window.__nav = [];
+  document.addEventListener('click', (e) => { const a = e.target.closest && e.target.closest('a.act-send, a.act-linkedin'); if (a) { e.preventDefault(); window.__nav.push(a.href); } }, true);
+};
+await page.addInitScript(recordLinks);
 await page.goto(base, { waitUntil: 'networkidle' });
 const total = await page.locator('.card').count();
 console.log(`Loaded ${base} with ${total} opportunities rendered`);
@@ -97,7 +102,7 @@ check(!/\{\{\w+\}\}/.test(subject + body), 'no unfilled {{placeholders}} in emai
 const note = await card.locator('.d-note').inputValue();
 check(note.length > 0 && note.length <= 300, `LinkedIn note within 300 chars (${note.length})`);
 
-// Send email → navigation goes through window.OH_NAV (installed above); check the URL the app builds.
+// Send email → the link the app built (recorded above) carries the subject and body.
 await card.locator('.act-send').click();
 const nav = await page.evaluate(() => window.__nav);
 check(nav.length === 1 && /^(mailto:|https:\/\/mail\.google\.com\/|https:\/\/outlook\.office\.com\/)/.test(nav[0]) && /(subject|su)=/.test(nav[0]) && /body=/.test(nav[0]), 'Send email builds a mail link with subject and body');
@@ -174,6 +179,64 @@ check(overflow2 <= 0, `no horizontal overflow at 390px with outreach open (delta
 // Every link is http(s), mailto or an anchor
 const badLinks = await page.evaluate(() => Array.from(document.querySelectorAll('a[href]')).map((a) => a.getAttribute('href')).filter((h) => !/^(https?:|mailto:|#)/.test(h)));
 check(badLinks.length === 0, `all links are http(s)/mailto/anchor (${badLinks.join(', ') || 'none bad'})`);
+
+// "Clear everything" needs a second click
+await page.setViewportSize({ width: 1280, height: 900 });
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator('.card').first().locator('.status').selectOption('shortlisted');
+await page.click('#btn-profile');
+await page.click('#btn-wipe');
+const notContacted = async () => Number(await page.locator('#stages .stage[data-stage="new"] .n').innerText());
+check((await notContacted()) < total, 'one click on Clear everything clears nothing');
+await page.click('#btn-wipe');
+check((await notContacted()) === total, 'a second click on Clear everything clears progress');
+
+// Inside the claude.ai artifact viewer, with a fake window.claude: progress saved to the account,
+// Gmail links by default, and files offered through the viewer's save prompt.
+const seedId = await page.evaluate(() => document.querySelectorAll('.card')[1]?.dataset.id);
+const vctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await vctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+const vpage = await vctx.newPage();
+vpage.on('pageerror', (e) => errors.push(`viewer pageerror: ${e.message}`));
+vpage.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`viewer console: ${m.text()}`); });
+await vpage.addInitScript(recordLinks);
+await vpage.addInitScript((seed) => {
+  const store = new Map(); window.__store = store; window.__saves = [];
+  if (seed) store.set(`data/users/viewer1/t-${seed}`, { status: 'interviewing', notes: 'seeded', drafts: {}, contact: 0 });
+  const snap = (p, v) => ({ id: p.split('/').pop(), exists: v !== undefined, data: () => v, metadata: { fromCache: false, hasPendingWrites: false } });
+  const ref = (p) => ({ id: p.split('/').pop(), path: p, get: async () => snap(p, store.get(p)),
+    set: async (d) => { store.set(p, JSON.parse(JSON.stringify(d))); }, delete: async () => { store.delete(p); } });
+  const db = { doc: ref, collection: (c) => ({ path: c, doc: (id) => ref(`${c}/${id}`), get: async () => {
+    const docs = [...store.entries()].filter(([p]) => p.startsWith(`${c}/`) && !p.slice(c.length + 1).includes('/')).map(([p, v]) => snap(p, v));
+    return { docs, size: docs.length, empty: !docs.length, metadata: { fromCache: false, hasPendingWrites: false }, docChanges: () => [] };
+  } }) };
+  const caps = { db, user: { id: async () => 'viewer1' }, downloads: { save: async ({ filename, data }) => { window.__saves.push({ filename, data: String(data) }); return { status: 'saved' }; } } };
+  window.claude = { use: async (n) => caps[n] || null };
+}, seedId);
+await vpage.goto(base, { waitUntil: 'networkidle' });
+await vpage.waitForFunction(() => /Claude account/.test(document.querySelector('.saved-where')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+check(/Claude account/.test(await vpage.locator('.saved-where').first().textContent()), 'viewer: says progress is saved to the Claude account');
+check(!seedId || (await vpage.locator('#stages .stage[data-stage="interviewing"] .n').innerText()) === '1', 'viewer: progress saved in the account shows on load');
+const vcard = vpage.locator('.card').first();
+await vcard.locator('.btn-write').click();
+const sendHref = await vcard.locator('.act-send').getAttribute('href');
+check(/^https:\/\/mail\.google\.com\//.test(sendHref) && (await vcard.locator('.act-send').getAttribute('target')) === '_blank', 'viewer: email opens Gmail in a new tab by default');
+check((await vcard.locator('.act-linkedin').first().getAttribute('target')) === '_blank' && /linkedin\.com/.test(await vcard.locator('.act-linkedin').first().getAttribute('href')), 'viewer: LinkedIn button is a real link to linkedin.com');
+await vcard.locator('.d-subject').fill('Changed subject line');
+check(/Changed%20subject%20line/.test(await vcard.locator('.act-send').getAttribute('href')), 'viewer: editing the subject updates the email link');
+const vid = await vcard.getAttribute('data-id');
+await vcard.locator('.status').selectOption('replied');
+await vpage.waitForFunction((id) => window.__store.get(`data/users/viewer1/t-${id}`)?.status === 'replied', vid, { timeout: 5000 }).catch(() => {});
+check((await vpage.evaluate((id) => window.__store.get(`data/users/viewer1/t-${id}`)?.status, vid)) === 'replied', 'viewer: a status change is saved to the account');
+await vpage.click('#btn-export');
+await vpage.waitForFunction(() => window.__saves.length > 0, null, { timeout: 5000 }).catch(() => {});
+const saved = await vpage.evaluate(() => window.__saves[0]);
+check(saved && saved.filename === 'opportunity-hunter.csv' && saved.data.startsWith('company,role,'), 'viewer: CSV goes through the save prompt');
+await vpage.click('#btn-profile');
+await vpage.click('#btn-wipe'); await vpage.click('#btn-wipe');
+await vpage.waitForFunction(() => window.__store.size === 0, null, { timeout: 5000 }).catch(() => {});
+check((await vpage.evaluate(() => window.__store.size)) === 0, 'viewer: Clear everything also clears the account copy');
+await vctx.close();
 
 await browser.close(); server.close();
 check(errors.length === 0, `no page/console errors (${errors.join(' | ') || 'none'})`);
