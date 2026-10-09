@@ -24,8 +24,43 @@
   const plain = (o) => Object.assign(Object.create(null), o && typeof o === 'object' ? o : {});
   const asObj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
+  if (!document.documentElement.lang) document.documentElement.lang = 'en';
+
   // Set when the page is open inside the claude.ai artifact viewer.
   const HOST = window.claude && typeof window.claude.use === 'function' ? window.claude : null;
+
+  // Saved progress and details come from this browser, a backup file or the account, so each
+  // entry is rebuilt from known fields with the expected types before the page uses it.
+  const PROFILE_KEYS = ['name', 'email', 'phone', 'linkedin', 'cv_url', 'headline', 'mail_client', 'signature'];
+  const MAIL_CLIENTS = ['mailto', 'gmail', 'outlook'];
+  const DRAFT_FIELDS = ['email_subject', 'email_body', 'linkedin_note', 'linkedin_inmail'];
+  function cleanProfile(v) {
+    const p = asObj(v); const out = {};
+    PROFILE_KEYS.forEach((k) => { if (typeof p[k] === 'string') out[k] = p[k]; });
+    if (out.mail_client && !MAIL_CLIENTS.includes(out.mail_client)) delete out.mail_client;
+    if (Number.isFinite(p.u)) out.u = p.u;
+    return out;
+  }
+  function cleanEntry(v) {
+    const e = asObj(v);
+    const s = {
+      status: Object.hasOwn(STATUS_LABEL, e.status) ? e.status : 'new',
+      notes: typeof e.notes === 'string' ? e.notes : '',
+      drafts: {},
+      contact: e.contact === 'careers' || (Number.isInteger(e.contact) && e.contact >= 0) ? e.contact : 0,
+    };
+    // Draft keys are the recipient picker's values: a contact index, "careers" or "none".
+    Object.entries(asObj(e.drafts)).forEach(([k, d]) => {
+      if (!/^(\d{1,3}|careers|none)$/.test(k)) return;
+      const out = {}; DRAFT_FIELDS.forEach((f) => { if (typeof asObj(d)[f] === 'string') out[f] = d[f]; });
+      if (Object.keys(out).length) s.drafts[k] = out;
+    });
+    if (typeof e.contacted_at === 'string' && !isNaN(new Date(e.contacted_at))) s.contacted_at = e.contacted_at;
+    if (e.contacted_via === 'email' || e.contacted_via === 'linkedin') s.contacted_via = e.contacted_via;
+    if (Number.isFinite(e.u)) s.u = e.u; // when it was last edited (Claude page only)
+    return s;
+  }
+  function cleanTracker(v) { const t = plain({}); Object.entries(asObj(v)).forEach(([id, e]) => { t[id] = cleanEntry(e); }); return t; }
 
   const DEFAULT_PROFILE = Object.assign({
     name: 'Your name', email: 'you@example.com', phone: '', linkedin: '', cv_url: '', headline: '',
@@ -34,12 +69,31 @@
   // mailto: links often do nothing inside the artifact viewer, so default to Gmail there.
   if (HOST && DEFAULT_PROFILE.mail_client === 'mailto') DEFAULT_PROFILE.mail_client = 'gmail';
 
+  // Where progress is kept:
+  //   'local'    standalone site: this browser (KEYS.*)
+  //   'starting' Claude page, before the account answers: nothing read, nothing editable yet
+  //   'account'  Claude page: this browser's copy for this account id, synced with the account
+  //   'offline'  Claude page, account known but not reachable or not writable: that same copy only
+  //   'memory'   Claude page with no account: kept on this page only, never written anywhere
+  // The Claude page never reads the plain KEYS copy: every account that opens the page in this
+  // browser shares one origin, so only copies keyed by account id are safe.
+  let mode = HOST ? 'starting' : 'local';
+  let prefix = ''; // 'oh:u:<account id>:' in 'account' and 'offline'
+  const written = Object.create(null); // document name -> JSON in this browser's copy
+
   let DATA = Array.isArray(window.OH_DATA) ? window.OH_DATA : [];
   let META = window.OH_META || {};
-  let tracker = plain(load(KEYS.tracker, {}));
-  let savedProfile = asObj(load(KEYS.profile, {}));
+  let tracker = HOST ? plain({}) : cleanTracker(load(KEYS.tracker, {}));
+  let savedProfile = HOST ? {} : cleanProfile(load(KEYS.profile, {}));
   let profile = Object.assign({}, DEFAULT_PROFILE, savedProfile);
-  let filters = Object.assign({}, DEFAULT_FILTERS, load(KEYS.filters, {}));
+  function cleanFilters(v) {
+    const f = asObj(v); const out = Object.assign({}, DEFAULT_FILTERS);
+    Object.keys(DEFAULT_FILTERS).forEach((k) => { if (typeof f[k] === typeof DEFAULT_FILTERS[k] && (typeof f[k] !== 'number' || Number.isFinite(f[k]))) out[k] = f[k]; });
+    return out;
+  }
+  let filters = HOST ? cleanFilters({}) : cleanFilters(load(KEYS.filters, {}));
+  // Whether this browser can keep anything at all (private modes and blocked site data can't).
+  const storageOk = (() => { try { localStorage.setItem('oh:probe', '1'); localStorage.removeItem('oh:probe'); return true; } catch (e) { return false; } })();
 
   // ---------- helpers ----------
   const firstName = (n) => (n || '').trim().split(/\s+/)[0] || '';
@@ -66,9 +120,13 @@
     pen: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>',
   };
 
-  function toast(msg) {
-    const t = $('#toast'); t.classList.add('show'); t.textContent = msg;
-    clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; }, 2800);
+  // Notices about where progress is saved stay up longer, and routine toasts don't cut them short.
+  function toast(msg, important = false) {
+    const t = $('#toast'); const now = Date.now();
+    if (!important && now < (toast._until || 0)) return;
+    t.classList.add('show'); t.textContent = msg;
+    toast._until = important ? now + 8000 : 0;
+    clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; toast._until = 0; }, important ? 8000 : 2800);
   }
 
   async function copyText(text) {
@@ -85,8 +143,20 @@
     if (!Object.hasOwn(tracker, id)) tracker[id] = { status: 'new', notes: '', drafts: {}, contact: 0 };
     const s = tracker[id]; if (!s.drafts || typeof s.drafts !== 'object') s.drafts = {}; return s;
   }
-  function persist() { save(KEYS.tracker, tracker); scheduleSync(); }
-  function saveProfile(p) { savedProfile = asObj(p); save(KEYS.profile, savedProfile); scheduleSync(); }
+  function persist() {
+    if (mode === 'local') save(KEYS.tracker, tracker);
+    else if (prefix) persistDocs();
+    scheduleSync();
+  }
+  function saveProfile(p) {
+    savedProfile = cleanProfile(p); delete savedProfile.u;
+    if (mode === 'local') save(KEYS.profile, savedProfile);
+    else if (prefix) {
+      if (Object.keys(savedProfile).length) { savedProfile.u = Date.now(); written.profile = JSON.stringify(savedProfile); lsSet(docKey('profile'), written.profile); }
+      else { delete written.profile; lsDel(docKey('profile')); }
+    }
+    scheduleSync();
+  }
 
   // The address to use for a contact: their published work email, else a likely one, else the careers inbox.
   function contactEmail(o, c) {
@@ -157,7 +227,8 @@
       : 'Open roles, the people hiring for them, and a message already written for each one.';
     const counts = Object.fromEntries(STAGES.map(([k]) => [k, 0]));
     DATA.forEach((o) => { const st = state(o.id).status; counts[Object.hasOwn(counts, st) ? st : 'new']++; });
-    $('#stages').innerHTML = STAGES.map(([k, label]) => `<button type="button" class="stage${counts[k] ? '' : ' is-zero'}" data-stage="${k}" aria-pressed="${filters.status === k}"><span class="n">${counts[k]}</span><span class="k">${esc(label)}</span></button>`).join('');
+    const starting = mode === 'starting';
+    $('#stages').innerHTML = STAGES.map(([k, label]) => `<button type="button" class="stage${counts[k] && !starting ? '' : ' is-zero'}" data-stage="${k}" aria-pressed="${filters.status === k}"><span class="n">${starting ? '–' : counts[k]}</span><span class="k">${esc(label)}</span></button>`).join('');
     $$('.stage', $('#stages')).forEach((b) => b.addEventListener('click', () => {
       filters.status = filters.status === b.dataset.stage ? 'any' : b.dataset.stage;
       $('#f-status').value = filters.status; saveFilters(); renderSummary(); renderList();
@@ -191,7 +262,12 @@
     };
     return rows.sort(by[filters.sort] || by.score);
   }
-  const saveFilters = () => save(KEYS.filters, filters);
+  // On the Claude page filters are kept per account, without the search text (it can name people).
+  let bootFilters = null; // filters as the Claude page started, before the account answered
+  const saveFilters = () => {
+    if (!HOST) { save(KEYS.filters, filters); return; }
+    if (prefix) save(`${prefix}f`, Object.assign({}, filters, { q: '' }));
+  };
   const activeExtraFilters = () => ['remote', 'minScore', 'status', 'emailOnly', 'verifiedOnly'].filter((k) => filters[k] !== DEFAULT_FILTERS[k]).length;
 
   function setFilterInputs() {
@@ -232,6 +308,8 @@
     $('#result-line').textContent = rows.length === DATA.length ? `Showing all ${rows.length} roles` : `Showing ${rows.length} of ${DATA.length} roles`;
     list.innerHTML = '';
     if (!DATA.length) { list.innerHTML = '<div class="empty">No roles loaded yet. Run <code>node scripts/build-data.mjs</code> to build <code>data/opportunities.js</code>.</div>'; return; }
+    // Roles appear once saved progress has loaded, so nothing is edited from a blank copy.
+    if (mode === 'starting') { list.innerHTML = '<div class="empty" role="status">Loading your saved progress…</div>'; return; }
     if (!rows.length) {
       list.innerHTML = '<div class="empty">No roles match these filters. <button type="button" class="btn btn-ghost btn-sm" id="empty-reset">Reset filters</button></div>';
       $('#empty-reset').addEventListener('click', () => $('#btn-clear').click());
@@ -425,14 +503,14 @@
       if (HOST && !isHttp(mailLink('', '', ''))) toast('Marked as contacted. If no email opened, use Copy, or choose Gmail or Outlook in Your details.');
       else toast(r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.');
     };
-    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); toast(ok ? 'Email copied' : 'Copy failed. Select the text and copy it yourself.'); };
+    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); if (ok) toast('Email copied'); else toast('Copy failed. Select the text and copy it yourself.', true); };
     // The link opens LinkedIn; the click copies the message (inside the click, so the clipboard allows it).
     $$('.act-linkedin', el).forEach((b) => { b.onclick = () => {
       const c = current(); const text = b.dataset.kind === 'note' ? note.value : inmail.value;
       const hasProfile = c && isHttp(c.linkedin_url);
       const copied = copyText(text);
       markContacted('linkedin');
-      copied.then((ok) => toast(ok ? (hasProfile ? `Copied. Paste it on ${firstName(c.name)}'s LinkedIn profile.` : 'Copied. No profile link, so LinkedIn search opened.') : 'Copy failed, but LinkedIn opened.'));
+      copied.then((ok) => { if (ok) toast(hasProfile ? `Copied. Paste it on ${firstName(c.name)}'s LinkedIn profile.` : 'Copied. No profile link, so LinkedIn search opened.'); else toast('Copy failed, but LinkedIn opened. Copy the message yourself.', true); });
     }; });
 
     loadDrafts();
@@ -449,8 +527,8 @@
   let lastFocus = null;
   const inertTargets = () => ['header.top', 'main', 'footer'].map((sel) => $(sel)).filter(Boolean);
   function fillForm() { Object.entries(profile).forEach(([k, v]) => { const f = form.elements[k]; if (f) f.value = v ?? ''; }); }
-  function openDrawer() { fillForm(); lastFocus = document.activeElement; drawer.hidden = false; backdrop.hidden = false; inertTargets().forEach((n) => { n.inert = true; }); $('input[name="name"]', form).focus(); }
-  function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; inertTargets().forEach((n) => { n.inert = false; }); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  function openDrawer() { fillForm(); delete form.dataset.dirty; lastFocus = document.activeElement; drawer.hidden = false; document.body.classList.add('drawer-open'); backdrop.hidden = false; inertTargets().forEach((n) => { n.inert = true; }); $('input[name="name"]', form).focus(); }
+  function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; document.body.classList.remove('drawer-open'); if (closeDrawer.redraw) { closeDrawer.redraw = false; renderList(); } inertTargets().forEach((n) => { n.inert = false; }); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
   $('#btn-profile').addEventListener('click', openDrawer);
   $('#btn-drawer-close').addEventListener('click', closeDrawer);
   backdrop.addEventListener('click', closeDrawer);
@@ -464,31 +542,67 @@
   form.addEventListener('submit', (e) => { e.preventDefault(); const fd = new FormData(form); profile = Object.assign({}, DEFAULT_PROFILE, Object.fromEntries(fd.entries())); saveProfile(profile); closeDrawer(); renderList(); toast('Saved. Messages you haven\'t edited now use these details.'); });
   $('#btn-profile-reset').addEventListener('click', () => { profile = Object.assign({}, DEFAULT_PROFILE); saveProfile({}); fillForm(); renderList(); toast('Back to the default details'); });
 
-  $('#btn-backup').addEventListener('click', async () => { if (await download('opportunity-hunter-backup.json', JSON.stringify({ tracker, profile, exported_at: nowIso() }, null, 2), 'application/json')) toast('Backup saved'); });
+  // The backup holds only the details you saved, so restoring it elsewhere keeps that page's defaults.
+  $('#btn-backup').addEventListener('click', async () => toastSaved(await download('opportunity-hunter-backup.json', JSON.stringify({ tracker, profile: savedProfile, source: HOST ? 'claude-page' : 'site', exported_at: nowIso() }, null, 2), 'application/json'), 'Backup saved'));
   $('#file-restore').addEventListener('change', async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    try { const j = JSON.parse(await f.text()); if (j.tracker && typeof j.tracker === 'object') tracker = plain(j.tracker); if (j.profile) profile = Object.assign({}, DEFAULT_PROFILE, j.profile); persist(); saveProfile(profile); fillForm(); renderSummary(); renderList(); toast('Backup restored'); }
-    catch (err) { toast('That file could not be read'); }
     e.target.value = '';
+    let t = null, p = null, source = '';
+    try {
+      const j = asObj(JSON.parse(await f.text()));
+      if (j.tracker && typeof j.tracker === 'object' && !Array.isArray(j.tracker)) t = cleanTracker(j.tracker);
+      if (j.profile && typeof j.profile === 'object' && !Array.isArray(j.profile)) p = cleanProfile(j.profile);
+      source = j.source;
+    } catch (err) { /* not JSON */ }
+    // A backup from the plain site carries its mailto: default, which rarely opens from the Claude page.
+    if (p && HOST && source !== 'claude-page' && p.mail_client === 'mailto') delete p.mail_client;
+    if (p) delete p.u;
+    if (p && !Object.keys(p).length) p = null; // nothing usable: keep the details you have
+    if (!t && !p) { toast('That file could not be read', true); return; }
+    if (t) { tracker = t; persist(); }
+    if (p) { profile = Object.assign({}, DEFAULT_PROFILE, p); saveProfile(p); }
+    fillForm(); renderSummary(); renderList(); toast('Backup restored');
   });
-  // Two clicks instead of confirm(), which the artifact viewer blocks.
+  // Standalone this is a confirm() dialog. The artifact viewer blocks confirm(), so there it takes a
+  // second, separate click: a double-click or a held key never counts as the confirmation. The
+  // button keeps its label (so it doesn't move under a finger) and the toast says what will go.
   const wipe = $('#btn-wipe'); const wipeLabel = wipe.textContent;
-  const disarmWipe = () => { clearTimeout(wipe._t); delete wipe.dataset.armed; wipe.textContent = wipeLabel; };
-  wipe.addEventListener('click', () => {
-    if (wipe.dataset.armed !== '1') { wipe.dataset.armed = '1'; wipe.textContent = 'Click again to clear everything'; clearTimeout(wipe._t); wipe._t = setTimeout(disarmWipe, 5000); return; }
-    disarmWipe(); tracker = plain({}); persist(); renderSummary(); renderList(); toast('Cleared');
+  wipe.addEventListener('keydown', (e) => { if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault(); }); // a held key clicks only once
+  const disarmWipe = () => { clearTimeout(wipe._t); delete wipe.dataset.armed; wipe.textContent = wipeLabel; wipe.removeAttribute('aria-describedby'); };
+  const clearAll = () => { tracker = plain({}); persist(); renderSummary(); renderList(); toast('Cleared'); };
+  wipe.addEventListener('click', (e) => {
+    if (!HOST) { if (confirm('Clear all progress, notes and edited messages in this browser?')) clearAll(); return; }
+    const now = performance.now(); const gap = now - (wipe._last || -Infinity); wipe._last = now;
+    if (wipe.dataset.armed !== '1') {
+      wipe.dataset.armed = '1'; wipe._armedAt = now;
+      wipe.setAttribute('aria-describedby', 'toast');
+      toast(`Click Clear everything again to delete all progress, notes and edited messages${sync.col ? ', here and in your Claude account' : ''}. Your details are kept.`, true);
+      clearTimeout(wipe._t); wipe._t = setTimeout(disarmWipe, 8000); return;
+    }
+    if (e.detail > 1 || gap < 400 || now - wipe._armedAt < 600) return;
+    disarmWipe(); toast._until = 0; clearAll();
   });
 
   // ---------- export ----------
   function csvCell(v) { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
   // In the artifact viewer a page can't start a download itself, so files go through its save prompt.
+  // Resolves true when saved, false when not, and null when a plain download was started but the
+  // page can't tell whether it worked (a Claude page without the save prompt).
   const downloads = HOST ? HOST.use('downloads').catch(() => null) : null;
   async function download(name, text, type) {
-    if (!HOST) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); return true; }
-    const dl = await downloads;
-    if (!dl) { toast('Saving files isn\'t available here.'); return false; }
-    try { await dl.save({ filename: name, data: text }); return true; }
-    catch (e) { if (!e || e.code !== 'declined') toast(e && e.code === 'rate_limited' ? 'A save is already waiting for you. Answer it first.' : 'The file could not be saved.'); return false; }
+    // A host that never answers resolves null only after 10 s: don't keep the click waiting that long.
+    const dl = HOST ? await Promise.race([downloads, new Promise((r) => { setTimeout(() => r(null), 1500); })]) : null;
+    if (dl) {
+      try { await dl.save({ filename: name, data: text }); return true; }
+      catch (e) { if (!e || e.code !== 'declined') toast(e && e.code === 'rate_limited' ? 'A save is already waiting for you. Answer it first.' : 'The file could not be saved.', true); return false; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return HOST ? null : true;
+  }
+  function toastSaved(result, msg) {
+    if (result) toast(msg);
+    else if (result === null) toast('Download started. If no file appears, this page can\'t save files.', true);
   }
   const exportCsv = async () => {
     const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
@@ -497,70 +611,325 @@
       const s = state(o.id); const cs = (o.contacts && o.contacts.length) ? o.contacts : [{}];
       cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, c.name, c.title, c.role_type, c.verified === true ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
     });
-    if (await download('opportunity-hunter.csv', rows.join('\n'), 'text/csv')) toast(`Saved ${rows.length - 1} rows as CSV`);
+    toastSaved(await download('opportunity-hunter.csv', rows.join('\n'), 'text/csv'), `Saved ${rows.length - 1} rows as CSV`);
   };
   $('#btn-export').addEventListener('click', exportCsv);
   $('#btn-export-2').addEventListener('click', exportCsv);
 
   // ---------- saved to your Claude account (only inside the artifact viewer) ----------
-  // Each viewer's copy lives under data/users/<their id>/, which nobody else can read.
-  // One document per role ("t-<id>") plus "profile"; local storage stays as the fast, offline copy.
+  // The account copy lives under data/users/<account id>/ in the artifact's db, which nobody else can
+  // read: one document per role ("t-<role id>") plus "profile". This browser keeps, per account id
+  // and per document, its own copy ("<prefix>t:<role id>", "<prefix>p") and what the account was last
+  // known to hold ("<prefix>s:<document>"). Each document records when it was last edited ("u").
+  // When the page opens, every document is merged three ways:
+  //   - this browser's copy is unchanged since it last matched the account: the account wins,
+  //     including when the account no longer has it (cleared or reset on another device);
+  //   - only this browser changed it (say the tab closed before the upload): this browser wins
+  //     and is uploaded;
+  //   - both changed: the later edit wins.
+  // The roles stay hidden until this has run, so nothing is ever edited from a blank copy.
   const SEG = /^[A-Za-z0-9_\-.~:@+]{1,180}$/;
-  const sync = { col: null, last: Object.create(null), timer: 0, running: false, again: false, warned: false };
+  const STOP_CODES = ['revoked', 'not_granted', 'capability_disabled', 'capability_removed'];
+  const BLOCK_CODES = ['invalid_argument', 'transform_error', 'quota_exceeded'];
+  const sync = { col: null, last: Object.create(null), blocked: Object.create(null), timer: 0, running: false, again: false, attempt: 0, failCode: '', canWrite: null };
+  const inBrowser = storageOk ? ' Progress is still saved in this browser.' : '';
   // Rendering a card creates a blank entry for it; only roles the person has touched are saved.
-  const untouched = (s) => !s || ((s.status || 'new') === 'new' && !s.notes && !s.contacted_at && !s.contact && !(s.drafts && Object.keys(s.drafts).length));
-  function scheduleSync() { if (!sync.col) return; clearTimeout(sync.timer); sync.timer = setTimeout(flushSync, 800); }
+  function untouched(s) { return !s || ((s.status || 'new') === 'new' && !s.notes && !s.contacted_at && !s.contact && !(s.drafts && Object.keys(s.drafts).length)); }
+  function lsKeys(pre) { const out = []; try { for (let i = 0; i < localStorage.length; i += 1) { const k = localStorage.key(i); if (k && k.startsWith(pre)) out.push(k); } } catch (e) { /* storage blocked */ } return out; }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* full or blocked */ } }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } }
+  const isDocName = (n) => n === 'profile' || (typeof n === 'string' && n.startsWith('t-') && SEG.test(n.slice(2)));
+  function docKey(name) { return name === 'profile' ? `${prefix}p` : `${prefix}t:${name.slice(2)}`; }
+  // Canonical JSON of a role entry or of the profile, or null when there is nothing to keep.
+  function entryJson(v) { const e = cleanEntry(v); return untouched(e) ? null : JSON.stringify(e); }
+  function profileJson(v) { const p = cleanProfile(v); const content = Object.assign({}, p); delete content.u; return Object.keys(content).length ? JSON.stringify(p) : null; }
+  function docJson(name, v) { return name === 'profile' ? profileJson(v) : entryJson(v); }
+  function parseDoc(name, json) { try { return docJson(name, JSON.parse(json)); } catch (e) { return null; } }
+  // Two copies match when they differ at most in their edit time.
+  function content(json) { if (!json) return null; try { const o = JSON.parse(json); delete o.u; return JSON.stringify(o); } catch (e) { return null; } }
+  function sameContent(a, b) { return content(a) === content(b); }
+  function editedAt(json) { try { const u = JSON.parse(json).u; return Number.isFinite(u) ? u : 0; } catch (e) { return 0; } }
+
+  // Writes the roles this tab changed into this browser's copy, with their edit time. Only changed
+  // documents are written, so a second tab on the same account never overwrites the others.
+  function persistDocs() {
+    const now = Date.now();
+    const names = new Set(Object.keys(written).filter((n) => n !== 'profile'));
+    Object.keys(tracker).forEach((id) => { if (SEG.test(id)) names.add(`t-${id}`); });
+    names.forEach((name) => {
+      const e = tracker[name.slice(2)];
+      if (sameContent(entryJson(e), written[name] || null)) return;
+      if (untouched(e)) { delete written[name]; lsDel(docKey(name)); return; }
+      e.u = now; written[name] = entryJson(e); lsSet(docKey(name), written[name]);
+    });
+  }
+  function wantDocs() {
+    const m = Object.create(null);
+    Object.keys(tracker).forEach((id) => { if (SEG.test(id)) { const j = entryJson(tracker[id]); if (j) m[`t-${id}`] = j; } });
+    const p = profileJson(savedProfile); if (p) m.profile = p;
+    return m;
+  }
+
+  function scheduleSync(delay = 800) { if (!sync.col) return; clearTimeout(sync.timer); sync.timer = setTimeout(flushSync, delay); }
+  function reportSync(code) {
+    if (!code) {
+      if (Object.keys(sync.blocked).length) return;
+      if (sync.failCode && !BLOCK_CODES.includes(sync.failCode)) { const t = $('#toast'); if (/^Couldn't save to your Claude account just now/.test(t.textContent)) { t.classList.remove('show'); t.textContent = ''; toast._until = 0; } }
+      sync.failCode = ''; return;
+    }
+    if (code === sync.failCode) return; // already told
+    sync.failCode = code;
+    toast(code === 'quota_exceeded' ? `Your Claude account storage for this page is full.${inBrowser}`
+      : BLOCK_CODES.includes(code) ? `One role couldn't be saved to your Claude account.${storageOk ? ' It\'s still saved in this browser.' : ''}`
+        : `Couldn't save to your Claude account just now. Trying again.${inBrowser}`, true);
+  }
+  function stopSync(kind) {
+    sync.col = null; clearTimeout(sync.timer);
+    setSavedWhere(storageOk ? 'in this browser only' : 'only until you close this page');
+    toast(kind === 'nowrite' ? `This page isn't allowed to save to your Claude account.${inBrowser}` : `This page can no longer save to your Claude account.${inBrowser}`, true);
+  }
   async function flushSync() {
+    if (!sync.col) return;
     if (sync.running) { sync.again = true; return; }
-    sync.running = true;
+    sync.running = true; let retry = false, problem = '';
     try {
-      const want = Object.create(null);
-      Object.keys(tracker).forEach((id) => { if (SEG.test(id) && !untouched(tracker[id])) want[`t-${id}`] = JSON.stringify(tracker[id]); });
-      if (Object.keys(savedProfile).length) want.profile = JSON.stringify(savedProfile);
-      // Writes go one at a time, and only for documents that changed since the last write.
+      const want = wantDocs();
+      // A document refused as it was is tried again once it has changed.
+      Object.keys(sync.blocked).forEach((n) => { if (!sameContent(sync.blocked[n].json, want[n] || null)) delete sync.blocked[n]; });
+      // One write at a time, only where the account differs. A failure affects only its own document.
       for (const name of new Set([...Object.keys(want), ...Object.keys(sync.last)])) {
+        if (!sync.col) break;
         const json = want[name] || null;
-        if (json === (sync.last[name] || null)) continue;
-        const ref = sync.col.doc(name);
-        if (json) { await ref.set(JSON.parse(json)); sync.last[name] = json; } else { await ref.delete(); delete sync.last[name]; }
+        if (sameContent(json, sync.last[name] || null) || Object.hasOwn(sync.blocked, name)) continue;
+        try {
+          const ref = sync.col.doc(name);
+          if (json) { await ref.set(JSON.parse(json)); sync.last[name] = json; lsSet(`${prefix}s:${name}`, json); }
+          else {
+            await ref.delete(); delete sync.last[name]; lsDel(`${prefix}s:${name}`);
+            // Space was freed, so documents refused for a full store can go again.
+            Object.keys(sync.blocked).forEach((n) => { if (sync.blocked[n].code === 'quota_exceeded') { delete sync.blocked[n]; sync.again = true; } });
+          }
+        } catch (e) {
+          const code = (e && e.code) || 'unavailable';
+          if (STOP_CODES.includes(code)) { stopSync('stopped'); break; }
+          // Refusing a small, ordinary document means this viewer may not write here at all
+          // (unless the host has said it may).
+          if (code === 'invalid_argument' && sync.canWrite !== true && (!json || new TextEncoder().encode(json).length < 200000)) { stopSync('nowrite'); break; }
+          if (BLOCK_CODES.includes(code)) sync.blocked[name] = { json, code }; else retry = true;
+          problem = problem || code;
+        }
       }
-    } catch (e) {
-      if (!sync.warned) { sync.warned = true; toast(e && e.code === 'quota_exceeded' ? 'Your account storage for this page is full. Progress is still saved in this browser.' : 'Couldn\'t save to your account just now. Progress is still saved in this browser.'); }
     } finally {
       sync.running = false;
+      if (sync.col) reportSync(problem);
       if (sync.again) { sync.again = false; scheduleSync(); }
+      else if (retry) { sync.attempt += 1; scheduleSync(Math.min(60000, 1000 * 2 ** sync.attempt) + Math.floor(Math.random() * 500)); }
+      else sync.attempt = 0;
     }
   }
+  // Send what's waiting when the page is hidden or closed. Anything that doesn't make it is in this
+  // browser's copy and goes out the next time the page opens.
+  const flushNow = () => { if (sync.col) { clearTimeout(sync.timer); flushSync(); } };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushNow(); });
+  window.addEventListener('pagehide', flushNow);
+
+  function setSavedWhere(text) { $$('.saved-where').forEach((n) => { n.textContent = text; }); }
+  // Redraws caused by another tab keep each card's open panels and tab, the focused control and its
+  // text selection, and the scroll position.
+  const controls = (el) => $$('a[href], button, input, select, textarea', el);
+  function keepUI(redraw) {
+    const state = new Map(); const active = document.activeElement; let focus = null;
+    $$('#list .card').forEach((c) => {
+      state.set(c.dataset.id, { details: !$('.details', c).hidden, composer: !$('.composer', c).hidden, tab: ($('.tab.active', c) || {}).dataset?.tab });
+      if (c.contains(active)) focus = { id: c.dataset.id, at: controls(c).indexOf(active), range: typeof active.selectionStart === 'number' ? [active.selectionStart, active.selectionEnd] : null };
+    });
+    const y = window.scrollY;
+    redraw();
+    $$('#list .card').forEach((c) => {
+      const st = state.get(c.dataset.id); if (!st) return;
+      [['.details', '.btn-details', st.details], ['.composer', '.btn-write', st.composer]].forEach(([panel, btn, open]) => {
+        if (open) { $(panel, c).hidden = false; $(btn, c).setAttribute('aria-expanded', 'true'); c.classList.add('is-open'); }
+      });
+      if (st.tab) { const t = $$('.tab', c).find((x) => x.dataset.tab === st.tab); if (t && !t.classList.contains('active')) t.click(); }
+    });
+    window.scrollTo(window.scrollX, y);
+    if (focus && focus.at >= 0) {
+      const c = $$('#list .card').find((x) => x.dataset.id === focus.id); const target = c ? controls(c)[focus.at] : null;
+      if (target) { target.focus({ preventScroll: true }); if (focus.range && typeof target.setSelectionRange === 'function') { try { target.setSelectionRange(focus.range[0], focus.range[1]); } catch (e) { /* not a text field */ } } }
+    }
+  }
+  function redrawCard(id) {
+    if (filters.status !== 'any' || filters.sort === 'recent') { keepUI(renderList); return; }
+    const old = $$('#list .card').find((c) => c.dataset.id === id); const o = DATA.find((x) => x.id === id);
+    if (!old || !o) return;
+    keepUI(() => { old.replaceWith(renderCard(o, $('#tpl-card'))); });
+  }
+  form.addEventListener('input', () => { form.dataset.dirty = '1'; });
+  // Another tab on the same account changed this browser's copy: show its change here too.
+  window.addEventListener('storage', (ev) => {
+    if (!prefix || mode === 'starting' || !ev.key || !ev.key.startsWith(prefix)) return;
+    const rest = ev.key.slice(prefix.length);
+    if (rest.startsWith('s:')) {
+      const n = rest.slice(2); if (!isDocName(n)) return;
+      const j = ev.newValue ? parseDoc(n, ev.newValue) : null;
+      if (j) sync.last[n] = j; else delete sync.last[n];
+      return;
+    }
+    const name = rest === 'p' ? 'profile' : (rest.startsWith('t:') ? `t-${rest.slice(2)}` : '');
+    if (!isDocName(name)) return;
+    const json = ev.newValue ? parseDoc(name, ev.newValue) : null;
+    if (json) written[name] = json; else delete written[name];
+    if (name === 'profile') {
+      savedProfile = json ? JSON.parse(json) : {}; profile = Object.assign({}, DEFAULT_PROFILE, savedProfile);
+      if (drawer.hidden) keepUI(renderList);
+      else { if (form.dataset.dirty !== '1') fillForm(); closeDrawer.redraw = true; }
+      return;
+    }
+    const id = name.slice(2); const next = json ? JSON.parse(json) : cleanEntry({});
+    const cur = tracker[id];
+    if (cur && typeof cur === 'object') { Object.keys(cur).forEach((k) => { delete cur[k]; }); Object.assign(cur, next); } else tracker[id] = next;
+    renderSummary(); redrawCard(id);
+  });
+
+  const GATED = ['#btn-profile', '#btn-export', '#btn-export-2'];
+  function finishStart(next, where) {
+    mode = next;
+    setSavedWhere(where);
+    GATED.forEach((sel) => { const b = $(sel); if (b) b.disabled = false; });
+    renderSummary(); renderList();
+  }
+  const pause = (ms) => new Promise((r) => { setTimeout(r, ms); });
+  const NOT_KEPT = 'only until you close this page';
+
+  // A call that never settles must not leave the page on "Loading" for good.
+  const FAILED = Symbol('failed');
+  const settle = (p, ms) => Promise.race([Promise.resolve(p).catch(() => FAILED), pause(ms).then(() => FAILED)]);
+  function readCopy(kind) {
+    const out = Object.create(null), raw = Object.create(null);
+    lsKeys(prefix).forEach((k) => {
+      const rest = k.slice(prefix.length); const v = lsGet(k); if (v == null) return;
+      let n = '';
+      if (kind === 's' && rest.startsWith('s:')) n = rest.slice(2);
+      else if (kind === 'local' && rest === 'p') n = 'profile';
+      else if (kind === 'local' && rest.startsWith('t:')) n = `t-${rest.slice(2)}`;
+      if (!isDocName(n)) return;
+      raw[n] = v; const j = parseDoc(n, v); if (j) out[n] = j;
+    });
+    return { docs: out, raw };
+  }
+
   async function connectAccount() {
     if (!HOST) return;
-    try {
-      const [db, user] = await Promise.all([HOST.use('db'), HOST.use('user')]);
-      const uid = db && user ? await user.id() : null;
-      if (!uid) return;
-      const col = db.collection(`data/users/${uid}`);
-      const snap = await col.get();
-      let changed = false;
-      // What's saved in the account wins; anything only this browser has is uploaded below.
+    let db = null, user = null, uid = null;
+    try { [db, user] = await Promise.all([HOST.use('db'), HOST.use('user')]); } catch (e) { /* neither */ }
+    if (user) { const id = await settle(user.id(), 6000); uid = id === FAILED ? null : id; }
+    if (!uid || !SEG.test(String(uid)) || (!storageOk && !db)) {
+      finishStart('memory', NOT_KEPT);
+      toast('This page can\'t reach your Claude account, so changes made now won\'t be kept after you close it.', true);
+      return;
+    }
+    // The id is encoded so one account's keys can never look like another's (ids may contain ':').
+    prefix = `oh:u:${encodeURIComponent(uid)}:`;
+    if (typeof user.can === 'function') { const c = await settle(user.can('data.write'), 6000); sync.canWrite = c === true ? true : (c === false ? false : null); }
+
+    // What this browser knew the account held is read before asking the account. It is written
+    // only after the account accepted a write, so it can't be newer than the answer that follows.
+    const synced = readCopy('s');
+    const col = db ? db.collection(`data/users/${uid}`) : null;
+    let snap = null;
+    for (let i = 0; col && i < 3 && !snap; i += 1) {
+      const r = await settle(col.get(), 10000);
+      if (r !== FAILED) { snap = r; break; }
+      if (i < 2) await pause(800 * (i + 1) + Math.floor(Math.random() * 400));
+    }
+
+    // From here to the end there is no await. This browser's copy is read now, after the account
+    // has answered, so changes another tab made while this one was loading are part of the merge.
+    const { docs: local } = readCopy('local');
+    const hasCopy = Object.keys(local).length > 0 || Object.keys(synced.docs).length > 0;
+    if (!snap && !hasCopy) {
+      // Nothing to go on: never treat a silent account as an empty one.
+      prefix = '';
+      finishStart('memory', NOT_KEPT);
+      toast('Couldn\'t load your saved progress from your Claude account. Reload the page to try again; changes made now won\'t be kept.', true);
+      return;
+    }
+    // An earlier version of this page kept progress without the account id, and uploaded it to
+    // its owner's account as it went. It can't tell whose it is, so it is removed, not imported.
+    [KEYS.tracker, KEYS.profile, KEYS.filters].forEach(lsDel);
+
+    const account = Object.create(null);
+    const names = new Set([...Object.keys(local), ...Object.keys(synced.docs)]);
+    let merged = local;
+    if (snap) {
       snap.docs.forEach((d) => {
-        const body = d.exists ? d.data() : null; if (!body) return;
-        const json = JSON.stringify(body);
-        if (d.id === 'profile') { sync.last.profile = json; savedProfile = asObj(JSON.parse(json)); profile = Object.assign({}, DEFAULT_PROFILE, savedProfile); save(KEYS.profile, savedProfile); changed = true; }
-        else if (d.id.startsWith('t-')) { sync.last[d.id] = json; tracker[d.id.slice(2)] = JSON.parse(json); changed = true; }
+        const body = d.exists ? d.data() : null; if (!body || !isDocName(d.id)) return;
+        const j = docJson(d.id, body); if (j) { account[d.id] = j; names.add(d.id); }
       });
+      merged = Object.create(null);
+      names.forEach((n) => {
+        const L = local[n] || null, C = synced.docs[n] || null, A = account[n] || null;
+        let v;
+        if (sameContent(L, C)) v = A; // nothing new here: the account is the record
+        else if (sameContent(A, C)) v = L; // only this browser changed it
+        else if (!L || !A) v = L || A; // one side removed it, the other changed it: keep the change
+        else v = editedAt(L) > editedAt(A) ? L : A; // both changed: the later edit wins
+        if (v) merged[n] = v;
+      });
+    }
+
+    tracker = plain({}); savedProfile = {};
+    Object.entries(merged).forEach(([n, j]) => { if (n === 'profile') savedProfile = JSON.parse(j); else tracker[n.slice(2)] = JSON.parse(j); });
+    profile = Object.assign({}, DEFAULT_PROFILE, savedProfile);
+    // This browser's copy now matches the page; only documents that differ are rewritten.
+    Object.keys(written).forEach((n) => { delete written[n]; });
+    names.forEach((n) => {
+      if (merged[n]) { written[n] = merged[n]; if (local[n] !== merged[n]) lsSet(docKey(n), merged[n]); } else if (local[n]) lsDel(docKey(n));
+    });
+    if (snap) {
+      // What the account holds, as far as this tab knows. Where another tab recorded an accepted
+      // write after this tab asked the account, that record is newer than the answer: keep it.
+      sync.last = Object.create(null);
+      const sNames = new Set([...names, ...Object.keys(synced.raw)]);
+      sNames.forEach((n) => {
+        const key = `${prefix}s:${n}`; const now = lsGet(key);
+        if (now !== (synced.raw[n] ?? null)) { const j = now ? parseDoc(n, now) : null; if (j) sync.last[n] = j; return; }
+        if (account[n]) { sync.last[n] = account[n]; if (now !== account[n]) lsSet(key, account[n]); } else if (now != null) lsDel(key);
+      });
+    } else sync.last = synced.docs;
+
+    // Saved filters come back, except the ones changed while the page was loading.
+    const f = load(`${prefix}f`, null);
+    const changedEarly = Object.keys(DEFAULT_FILTERS).filter((k) => k !== 'q' && bootFilters && filters[k] !== bootFilters[k]);
+    if (f && typeof f === 'object') {
+      const saved = cleanFilters(f);
+      Object.keys(DEFAULT_FILTERS).forEach((k) => { if (k !== 'q' && !changedEarly.includes(k)) filters[k] = saved[k]; });
+      setFilterInputs();
+    }
+    if (changedEarly.length) saveFilters();
+
+    if (snap && sync.canWrite !== false) {
       sync.col = col;
-      if (changed) { save(KEYS.tracker, tracker); renderSummary(); renderList(); }
-      $$('.saved-where').forEach((n) => { n.textContent = 'to your Claude account and this browser'; });
-      scheduleSync();
-    } catch (e) { /* keep using this browser's storage */ }
+      finishStart('account', storageOk ? 'to your Claude account and this browser' : 'to your Claude account');
+      scheduleSync(0);
+    } else if (snap || sync.canWrite === false) {
+      finishStart('offline', 'in this browser only');
+    } else {
+      finishStart('offline', 'in this browser for now (reload the page to update your Claude account)');
+      toast('Couldn\'t reach your Claude account. Your progress is kept in this browser; reload the page to try again.', true);
+    }
   }
 
   // ---------- boot ----------
   async function boot() {
+    if (HOST) { GATED.forEach((sel) => { const b = $(sel); if (b) b.disabled = true; }); setSavedWhere('to your Claude account, once it has loaded'); }
     if (!DATA.length && location.protocol !== 'file:') {
       try { const r = await fetch('data/opportunities.json', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); DATA = Array.isArray(j.opportunities) ? j.opportunities : []; META = j.meta || {}; } } catch (e) { /* no data */ }
     }
     DATA = DATA.filter((o) => o && typeof o === 'object' && o.company);
     DATA.forEach((o) => { if (!o.id) o.id = slug(`${o.company} ${o.role_title || ''}`); });
+    bootFilters = Object.assign({}, filters);
     bindFilters(); renderSummary(); renderList();
     connectAccount();
   }
