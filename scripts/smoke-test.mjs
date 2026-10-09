@@ -237,8 +237,8 @@ check((await notContacted()) === total, 'Clear everything: answering OK clears p
 // written on every call, so it survives reloads and is shared by tabs like the real one.
 // Test-only switches, also in localStorage: __uid picks the account, __slow delays claude.use (ms),
 // __nodb hides the db, __nouser hides who is signed in, __failGet makes reading the account fail,
-// __failGetOnce makes only the next read fail, __holdGet holds a read's answer (taken when asked)
-// until the switch is removed, __can is what user.can('data.write') answers ("true", "false" or
+// __failGetOnce makes only the next read fail, __holdGet holds a read's answer (taken when asked,
+// or with "late" taken when released) until the switch is removed, __can is what user.can('data.write') answers ("true", "false" or
 // "throw"), __refuseWrites makes writes fail with invalid_argument, __nodl hides the save prompt.
 // window.__failNext makes that many of the next writes fail with "unavailable".
 const seedId = await page.evaluate(() => document.querySelectorAll('.card')[1]?.dataset.id);
@@ -263,8 +263,11 @@ const fakeClaude = (seed) => {
   const db = { doc: ref, collection: (c) => ({ path: c, doc: (id) => ref(`${c}/${id}`), get: async () => {
     if (flag('__failGet')) throw { code: 'unavailable', message: 'test outage' };
     if (flag('__failGetOnce')) { localStorage.removeItem('__failGetOnce'); throw { code: 'unavailable', message: 'test outage' }; }
-    const docs = [...readAll().entries()].filter(([p]) => p.startsWith(`${c}/`) && !p.slice(c.length + 1).includes('/')).map(([p, v]) => snap(p, v));
+    const late = flag('__holdGet') === 'late';
+    const take = () => [...readAll().entries()].filter(([p]) => p.startsWith(`${c}/`) && !p.slice(c.length + 1).includes('/')).map(([p, v]) => snap(p, v));
+    let docs = late ? null : take();
     while (flag('__holdGet')) await new Promise((r) => { setTimeout(r, 50); });
+    if (late) docs = take();
     return { docs, size: docs.length, empty: !docs.length, metadata: { fromCache: false, hasPendingWrites: false }, docChanges: () => [] };
   } }) };
   const uid = flag('__uid') || 'viewer1';
@@ -438,6 +441,20 @@ if (id5) {
   check((await statusOf(id5)) === 'interviewing' && (await statusOf(id5, tab3)) === 'interviewing' && (await accountDoc(id5))?.status === 'interviewing', "viewer: a tab that is still loading doesn't undo another tab's change");
   await tab3.close(); await vpage.waitForTimeout(500);
   check((await accountDoc(id5))?.status === 'interviewing', '... not even when it closes');
+
+  // A change made and then undone in one tab while another loads, whose answer still holds the
+  // change, stays undone.
+  await setFlag('__holdGet', 'late');
+  const tab4 = await viewerPage();
+  await tab4.goto(base, { waitUntil: 'domcontentloaded' });
+  await tab4.waitForTimeout(800);
+  await setStatus(id5, 'passed'); await waitAccount(id5, 'passed');
+  await vpage.waitForTimeout(300);
+  await setStatus(id5, 'interviewing');
+  await setFlag('__holdGet', null);
+  await waitReady(tab4); await tab4.waitForTimeout(2000);
+  check((await statusOf(id5)) === 'interviewing' && (await statusOf(id5, tab4)) === 'interviewing' && (await accountDoc(id5))?.status === 'interviewing', 'viewer: a change undone in one tab while another loads stays undone');
+  await tab4.close();
   await setStatus(id5, 'offer'); await waitAccount(id5, 'offer');
 
   // Another Claude account in the same browser sees nothing of the first account, not even a
@@ -534,15 +551,22 @@ check(savedFilters && savedFilters.region === 'UK' && savedFilters.q === '', "vi
 await vpage.fill('#f-q', '');
 await vpage.click('#regions .chip[data-region="any"]');
 
-// A filter chosen while the page is still loading is kept, and saved.
-await setFlag('__slow', '1500');
+// A filter chosen while the page is still loading is kept and saved, and the other saved filters
+// come back with it. Saved "More filters" choices open their panel.
+await vpage.selectOption('#f-sort', 'company');
+await vpage.click('#btn-more');
+await vpage.check('#f-email');
+await setFlag('__holdGet', '1'); // the account id is known, the account read is waiting
 await vpage.reload({ waitUntil: 'domcontentloaded' });
-await vpage.waitForTimeout(300);
+await vpage.waitForTimeout(800);
 await vpage.click('#regions .chip[data-region="Remote"]');
+await setFlag('__holdGet', null);
 await waitReady();
-check((await vpage.locator('#regions .chip[data-region="Remote"]').getAttribute('aria-pressed')) === 'true' && (await vpage.evaluate(() => JSON.parse(localStorage.getItem('oh:u:viewer1:f') || '{}').region)) === 'Remote', 'viewer: a filter chosen while loading is kept and saved');
-await setFlag('__slow', null);
-await vpage.click('#regions .chip[data-region="any"]');
+const fNow = await vpage.evaluate(() => JSON.parse(localStorage.getItem('oh:u:viewer1:f') || '{}'));
+check((await vpage.locator('#regions .chip[data-region="Remote"]').getAttribute('aria-pressed')) === 'true' && fNow.region === 'Remote' && fNow.sort === 'company' && fNow.emailOnly === true
+  && (await vpage.inputValue('#f-sort')) === 'company', 'viewer: a filter chosen while loading is kept and saved, with the other saved filters');
+check(await vpage.locator('#more-filters').isVisible(), 'viewer: saved "More filters" choices open their panel');
+await vpage.evaluate(() => document.querySelector('#btn-clear').click());
 
 // No save prompt: the file still downloads the plain way.
 await setFlag('__nodl', '1');
@@ -594,7 +618,11 @@ check((await vpage.locator('.card').count()) === total && (await statusOf(vfirst
   && (await accountDoc(vfirstId)) === null && okDoc?.notes === 'ok' && okDoc?.drafts?.['0']?.email_subject === 'kept' && !('evil' in (okDoc?.drafts || {})) && !/evil/.test(okLocal)
   && (await vpage.locator('#profile-form input[name="name"]').inputValue()) === 'Distinct Name' && (await accountProfile())?.name === 'Distinct Name', 'viewer: a crafted backup is cleaned before use and keeps the saved details');
 
-// Restoring the backup brings the progress back, here and in the account.
+// Restoring the backup brings the progress back, here and in the account (after a wrong file
+// first, whose message gives way to the result).
+await vpage.locator('#file-restore').setInputFiles({ name: 'wrong.csv', mimeType: 'text/csv', buffer: Buffer.from('company,role\nAcme,FDE') });
+await vpage.waitForTimeout(300);
+check(/could not be read/.test(await vpage.locator('#toast').innerText()), 'viewer: a file that is not a backup says so');
 await vpage.locator('#file-restore').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(backup ? backup.data : '{}') });
 await waitAccount(vfirstId, 'replied');
 check(/Backup restored/.test(await vpage.locator('#toast').innerText()) && (await statusOf(vfirstId)) === 'replied' && (await accountDoc(vfirstId))?.status === 'replied', 'viewer: restoring a backup brings the progress back, here and in the account');

@@ -19,7 +19,8 @@ jobs:
   smoke:
     # The headless browser test of the site, on the real data and on the fictional fixture,
     # including the Claude page behaviour with a fake window.claude.
-    runs-on: ubuntu-latest
+    # Pinned: Playwright 1.55 has no Chromium build for newer Ubuntu images.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

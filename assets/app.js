@@ -120,13 +120,16 @@
     pen: '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>',
   };
 
-  // Notices about where progress is saved stay up longer, and routine toasts don't cut them short.
-  function toast(msg, important = false) {
+  // Three kinds of message: routine results of what the person just did; 'alert', a failure of their
+  // own action or a question, which stays up longer but gives way to the result of their next
+  // action; and 'notice', news about where progress is saved, which stays up longer and is
+  // protected from being replaced for its first 3 s so it can be read.
+  function toast(msg, kind = '') {
     const t = $('#toast'); const now = Date.now();
-    if (!important && now < (toast._until || 0)) return;
+    if (kind !== 'notice' && kind !== 'alert' && now < (toast._until || 0)) return;
     t.classList.add('show'); t.textContent = msg;
-    toast._until = important ? now + 8000 : 0;
-    clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; toast._until = 0; }, important ? 8000 : 2800);
+    toast._until = kind === 'notice' ? now + 3000 : 0;
+    clearTimeout(toast._t); toast._t = setTimeout(() => { t.classList.remove('show'); t.textContent = ''; toast._until = 0; }, kind ? 8000 : 2800);
   }
 
   async function copyText(text) {
@@ -266,7 +269,7 @@
   let bootFilters = null; // filters as the Claude page started, before the account answered
   const saveFilters = () => {
     if (!HOST) { save(KEYS.filters, filters); return; }
-    if (prefix) save(`${prefix}f`, Object.assign({}, filters, { q: '' }));
+    if (prefix && mode !== 'starting') save(`${prefix}f`, Object.assign({}, filters, { q: '' }));
   };
   const activeExtraFilters = () => ['remote', 'minScore', 'status', 'emailOnly', 'verifiedOnly'].filter((k) => filters[k] !== DEFAULT_FILTERS[k]).length;
 
@@ -503,14 +506,14 @@
       if (HOST && !isHttp(mailLink('', '', ''))) toast('Marked as contacted. If no email opened, use Copy, or choose Gmail or Outlook in Your details.');
       else toast(r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.');
     };
-    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); if (ok) toast('Email copied'); else toast('Copy failed. Select the text and copy it yourself.', true); };
+    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); if (ok) toast('Email copied'); else toast('Copy failed. Select the text and copy it yourself.', 'alert'); };
     // The link opens LinkedIn; the click copies the message (inside the click, so the clipboard allows it).
     $$('.act-linkedin', el).forEach((b) => { b.onclick = () => {
       const c = current(); const text = b.dataset.kind === 'note' ? note.value : inmail.value;
       const hasProfile = c && isHttp(c.linkedin_url);
       const copied = copyText(text);
       markContacted('linkedin');
-      copied.then((ok) => { if (ok) toast(hasProfile ? `Copied. Paste it on ${firstName(c.name)}'s LinkedIn profile.` : 'Copied. No profile link, so LinkedIn search opened.'); else toast('Copy failed, but LinkedIn opened. Copy the message yourself.', true); });
+      copied.then((ok) => { if (ok) toast(hasProfile ? `Copied. Paste it on ${firstName(c.name)}'s LinkedIn profile.` : 'Copied. No profile link, so LinkedIn search opened.'); else toast('Copy failed, but LinkedIn opened. Copy the message yourself.', 'alert'); });
     }; });
 
     loadDrafts();
@@ -528,7 +531,7 @@
   const inertTargets = () => ['header.top', 'main', 'footer'].map((sel) => $(sel)).filter(Boolean);
   function fillForm() { Object.entries(profile).forEach(([k, v]) => { const f = form.elements[k]; if (f) f.value = v ?? ''; }); }
   function openDrawer() { fillForm(); delete form.dataset.dirty; lastFocus = document.activeElement; drawer.hidden = false; document.body.classList.add('drawer-open'); backdrop.hidden = false; inertTargets().forEach((n) => { n.inert = true; }); $('input[name="name"]', form).focus(); }
-  function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; document.body.classList.remove('drawer-open'); if (closeDrawer.redraw) { closeDrawer.redraw = false; renderList(); } inertTargets().forEach((n) => { n.inert = false; }); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; document.body.classList.remove('drawer-open'); if (closeDrawer.redraw) { closeDrawer.redraw = false; keepUI(renderList); } inertTargets().forEach((n) => { n.inert = false; }); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
   $('#btn-profile').addEventListener('click', openDrawer);
   $('#btn-drawer-close').addEventListener('click', closeDrawer);
   backdrop.addEventListener('click', closeDrawer);
@@ -558,7 +561,7 @@
     if (p && HOST && source !== 'claude-page' && p.mail_client === 'mailto') delete p.mail_client;
     if (p) delete p.u;
     if (p && !Object.keys(p).length) p = null; // nothing usable: keep the details you have
-    if (!t && !p) { toast('That file could not be read', true); return; }
+    if (!t && !p) { toast('That file could not be read', 'alert'); return; }
     if (t) { tracker = t; persist(); }
     if (p) { profile = Object.assign({}, DEFAULT_PROFILE, p); saveProfile(p); }
     fillForm(); renderSummary(); renderList(); toast('Backup restored');
@@ -568,7 +571,7 @@
   // button keeps its label (so it doesn't move under a finger) and the toast says what will go.
   const wipe = $('#btn-wipe'); const wipeLabel = wipe.textContent;
   wipe.addEventListener('keydown', (e) => { if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault(); }); // a held key clicks only once
-  const disarmWipe = () => { clearTimeout(wipe._t); delete wipe.dataset.armed; wipe.textContent = wipeLabel; wipe.removeAttribute('aria-describedby'); };
+  const disarmWipe = () => { clearTimeout(wipe._t); delete wipe.dataset.armed; wipe.textContent = wipeLabel; wipe.removeAttribute('aria-describedby'); const t = $('#toast'); if (/^Click Clear everything again/.test(t.textContent)) { t.classList.remove('show'); t.textContent = ''; } };
   const clearAll = () => { tracker = plain({}); persist(); renderSummary(); renderList(); toast('Cleared'); };
   wipe.addEventListener('click', (e) => {
     if (!HOST) { if (confirm('Clear all progress, notes and edited messages in this browser?')) clearAll(); return; }
@@ -576,11 +579,11 @@
     if (wipe.dataset.armed !== '1') {
       wipe.dataset.armed = '1'; wipe._armedAt = now;
       wipe.setAttribute('aria-describedby', 'toast');
-      toast(`Click Clear everything again to delete all progress, notes and edited messages${sync.col ? ', here and in your Claude account' : ''}. Your details are kept.`, true);
+      toast(`Click Clear everything again to delete all progress, notes and edited messages${sync.col ? ', here and in your Claude account' : ''}. Your details are kept.`, 'alert');
       clearTimeout(wipe._t); wipe._t = setTimeout(disarmWipe, 8000); return;
     }
     if (e.detail > 1 || gap < 400 || now - wipe._armedAt < 600) return;
-    disarmWipe(); toast._until = 0; clearAll();
+    disarmWipe(); clearAll();
   });
 
   // ---------- export ----------
@@ -594,7 +597,7 @@
     const dl = HOST ? await Promise.race([downloads, new Promise((r) => { setTimeout(() => r(null), 1500); })]) : null;
     if (dl) {
       try { await dl.save({ filename: name, data: text }); return true; }
-      catch (e) { if (!e || e.code !== 'declined') toast(e && e.code === 'rate_limited' ? 'A save is already waiting for you. Answer it first.' : 'The file could not be saved.', true); return false; }
+      catch (e) { if (!e || e.code !== 'declined') toast(e && e.code === 'rate_limited' ? 'A save is already waiting for you. Answer it first.' : 'The file could not be saved.', 'alert'); return false; }
     }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -602,7 +605,7 @@
   }
   function toastSaved(result, msg) {
     if (result) toast(msg);
-    else if (result === null) toast('Download started. If no file appears, this page can\'t save files.', true);
+    else if (result === null) toast('Download started. If no file appears, this page can\'t save files.', 'alert');
   }
   const exportCsv = async () => {
     const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
@@ -649,6 +652,9 @@
   // Two copies match when they differ at most in their edit time.
   function content(json) { if (!json) return null; try { const o = JSON.parse(json); delete o.u; return JSON.stringify(o); } catch (e) { return null; } }
   function sameContent(a, b) { return content(a) === content(b); }
+  // Left in place of "what the account held" after a delete. It reads as no document, but it is a
+  // change another loading tab can see.
+  const removedMark = () => JSON.stringify({ removed: Date.now() });
   function editedAt(json) { try { const u = JSON.parse(json).u; return Number.isFinite(u) ? u : 0; } catch (e) { return 0; } }
 
   // Writes the roles this tab changed into this browser's copy, with their edit time. Only changed
@@ -682,12 +688,12 @@
     sync.failCode = code;
     toast(code === 'quota_exceeded' ? `Your Claude account storage for this page is full.${inBrowser}`
       : BLOCK_CODES.includes(code) ? `One role couldn't be saved to your Claude account.${storageOk ? ' It\'s still saved in this browser.' : ''}`
-        : `Couldn't save to your Claude account just now. Trying again.${inBrowser}`, true);
+        : `Couldn't save to your Claude account just now. Trying again.${inBrowser}`, 'notice');
   }
   function stopSync(kind) {
     sync.col = null; clearTimeout(sync.timer);
     setSavedWhere(storageOk ? 'in this browser only' : 'only until you close this page');
-    toast(kind === 'nowrite' ? `This page isn't allowed to save to your Claude account.${inBrowser}` : `This page can no longer save to your Claude account.${inBrowser}`, true);
+    toast(kind === 'nowrite' ? `This page isn't allowed to save to your Claude account.${inBrowser}` : `This page can no longer save to your Claude account.${inBrowser}`, 'notice');
   }
   async function flushSync() {
     if (!sync.col) return;
@@ -706,7 +712,7 @@
           const ref = sync.col.doc(name);
           if (json) { await ref.set(JSON.parse(json)); sync.last[name] = json; lsSet(`${prefix}s:${name}`, json); }
           else {
-            await ref.delete(); delete sync.last[name]; lsDel(`${prefix}s:${name}`);
+            await ref.delete(); delete sync.last[name]; lsSet(`${prefix}s:${name}`, removedMark());
             // Space was freed, so documents refused for a full store can go again.
             Object.keys(sync.blocked).forEach((n) => { if (sync.blocked[n].code === 'quota_exceeded') { delete sync.blocked[n]; sync.again = true; } });
           }
@@ -826,7 +832,7 @@
     if (user) { const id = await settle(user.id(), 6000); uid = id === FAILED ? null : id; }
     if (!uid || !SEG.test(String(uid)) || (!storageOk && !db)) {
       finishStart('memory', NOT_KEPT);
-      toast('This page can\'t reach your Claude account, so changes made now won\'t be kept after you close it.', true);
+      toast('This page can\'t reach your Claude account, so changes made now won\'t be kept after you close it.', 'notice');
       return;
     }
     // The id is encoded so one account's keys can never look like another's (ids may contain ':').
@@ -835,10 +841,11 @@
 
     // What this browser knew the account held is read before asking the account. It is written
     // only after the account accepted a write, so it can't be newer than the answer that follows.
-    const synced = readCopy('s');
+    let synced = readCopy('s');
     const col = db ? db.collection(`data/users/${uid}`) : null;
     let snap = null;
     for (let i = 0; col && i < 3 && !snap; i += 1) {
+      synced = readCopy('s');
       const r = await settle(col.get(), 10000);
       if (r !== FAILED) { snap = r; break; }
       if (i < 2) await pause(800 * (i + 1) + Math.floor(Math.random() * 400));
@@ -852,7 +859,7 @@
       // Nothing to go on: never treat a silent account as an empty one.
       prefix = '';
       finishStart('memory', NOT_KEPT);
-      toast('Couldn\'t load your saved progress from your Claude account. Reload the page to try again; changes made now won\'t be kept.', true);
+      toast('Couldn\'t load your saved progress from your Claude account. Reload the page to try again; changes made now won\'t be kept.', 'notice');
       return;
     }
     // An earlier version of this page kept progress without the account id, and uploaded it to
@@ -870,8 +877,12 @@
       merged = Object.create(null);
       names.forEach((n) => {
         const L = local[n] || null, C = synced.docs[n] || null, A = account[n] || null;
+        // Another tab synced this document while this one was loading: its copy here is newer
+        // than the answer this tab got.
+        const moved = (lsGet(`${prefix}s:${n}`) ?? null) !== (synced.raw[n] ?? null);
         let v;
-        if (sameContent(L, C)) v = A; // nothing new here: the account is the record
+        if (moved) v = L;
+        else if (L === C) v = A; // nothing new here (not even an edit and undo): the account is the record
         else if (sameContent(A, C)) v = L; // only this browser changed it
         else if (!L || !A) v = L || A; // one side removed it, the other changed it: keep the change
         else v = editedAt(L) > editedAt(A) ? L : A; // both changed: the later edit wins
@@ -895,7 +906,7 @@
       sNames.forEach((n) => {
         const key = `${prefix}s:${n}`; const now = lsGet(key);
         if (now !== (synced.raw[n] ?? null)) { const j = now ? parseDoc(n, now) : null; if (j) sync.last[n] = j; return; }
-        if (account[n]) { sync.last[n] = account[n]; if (now !== account[n]) lsSet(key, account[n]); } else if (now != null) lsDel(key);
+        if (account[n]) { sync.last[n] = account[n]; if (now !== account[n]) lsSet(key, account[n]); } else if (now != null && parseDoc(n, now)) lsSet(key, removedMark());
       });
     } else sync.last = synced.docs;
 
@@ -906,8 +917,8 @@
       const saved = cleanFilters(f);
       Object.keys(DEFAULT_FILTERS).forEach((k) => { if (k !== 'q' && !changedEarly.includes(k)) filters[k] = saved[k]; });
       setFilterInputs();
+      if (activeExtraFilters()) { $('#more-filters').hidden = false; $('#btn-more').setAttribute('aria-expanded', 'true'); }
     }
-    if (changedEarly.length) saveFilters();
 
     if (snap && sync.canWrite !== false) {
       sync.col = col;
@@ -917,8 +928,9 @@
       finishStart('offline', 'in this browser only');
     } else {
       finishStart('offline', 'in this browser for now (reload the page to update your Claude account)');
-      toast('Couldn\'t reach your Claude account. Your progress is kept in this browser; reload the page to try again.', true);
+      toast('Couldn\'t reach your Claude account. Your progress is kept in this browser; reload the page to try again.', 'notice');
     }
+    if (changedEarly.length) saveFilters(); // the filters chosen while loading, with the saved ones
   }
 
   // ---------- boot ----------
