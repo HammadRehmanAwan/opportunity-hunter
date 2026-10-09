@@ -14,5 +14,16 @@ window.OH_DATA = [
     contacts: [ { name: "Bob <b>Bold</b>", title: "Recruiter", role_type: "recruiter", linkedin_url: "javascript:alert(2)", email: "bob@example.net", email_status: "<img src=x onerror=\"document.body.insertAdjacentHTML('beforeend','<i id=xss-canary></i>')\">", verified: "false", why_them: "Posts roles." } ],
     linkedin_people_search_url: "javascript:alert(3)",
     drafts: { email_subject: "{{role}} at {{company}}", email_body: "Hi {{first_name}},\n\n{{my_name}} here.\n\n{{signature}}", linkedin_note: "Hi {{first_name}} — keen on {{company}}.", linkedin_inmail: "Hi,\n\nMessage.\n\n{{my_name}}" },
-    verification: { job_url_live: "false", overall_confidence: "low", issues: "" }, sources: ["javascript:alert(4)"], last_verified: "2026-09-30" }
+    verification: { job_url_live: "false", overall_confidence: "low", issues: "" }, sources: ["javascript:alert(4)"], last_verified: "2026-09-30" },
+  { id: "delta-4", company: "Delta Systems", role_title: "Forward Deployed AI Engineer", location: "Manchester, UK", region: "UK", remote_policy: "hybrid", job_url: "https://example.com/jobs/4", score: 7, rationale: "Good fit.", why_fde: "Customer-facing build work.", suggested_contact: "Recruiter",
+    contacts: [
+      { name: "Riya Nolink", title: "Talent Partner", role_type: "recruiter", linkedin_url: "", email: "riya@example.com", email_status: "pattern_guess", verified: false, why_them: "Hires for the team." },
+      { name: "Sam Profile", title: "Engineering Manager, Deployments", role_type: "hiring_manager", linkedin_url: "https://uk.linkedin.com/in/sam-profile-123/", email: "", verified: true, why_them: "Manages the team." },
+    ],
+    drafts: { email_subject: "{{role}} at {{company}}", email_body: "Hi {{first_name}},\n\nI'm {{my_name}}.\n\n{{signature}}", linkedin_note: "Hi {{first_name}}, {{my_first_name}} here. Keen on the {{role}} role.", linkedin_inmail: "Hi {{first_name}},\n\nAbout {{company}}.\n\n{{my_name}}" },
+    verification: { job_status: "listed_recently", job_url_live: true, overall_confidence: "medium", issues: "" }, sources: ["https://example.com/jobs/4"], last_verified: "2026-09-30" },
+  { id: "epsilon-5", company: "Epsilon AI", role_title: "Solutions Engineer, Agents", location: "Remote (Europe)", region: "Europe", remote_policy: "remote", job_url: "https://example.com/jobs/5", score: 5, rationale: "Possible fit.", why_fde: "Agent deployments.", suggested_contact: "Founder",
+    contacts: [ { name: "Eve Founder", title: "Co-founder", role_type: "founder", linkedin_url: "https://www.linkedin.com/in/eve-founder/", email: "eve@example.org", email_status: "verified_public", verified: true, why_them: "Runs hiring." } ],
+    drafts: { email_subject: "{{role}} at {{company}}", email_body: "Hi {{first_name}},\n\n{{my_name}} here.\n\n{{signature}}", linkedin_note: "Hi {{first_name}}, keen on {{company}}.", linkedin_inmail: "Hi {{first_name}},\n\nMessage.\n\n{{my_name}}" },
+    verification: { job_status: "listed_recently", job_url_live: true, overall_confidence: "high", issues: "" }, sources: ["https://example.com/jobs/5"], last_verified: "2026-09-30" }
 ];

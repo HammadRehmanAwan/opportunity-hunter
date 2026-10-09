@@ -16,3 +16,20 @@ jobs:
         run: node scripts/build-data.mjs
       - name: Fail if the committed data/opportunities.js is stale
         run: git diff --exit-code -- data/opportunities.js
+  smoke:
+    # The headless browser test of the site, on the real data and on the fictional fixture,
+    # including the Claude page behaviour with a fake window.claude.
+    # Pinned: Playwright 1.55 has no Chromium build for newer Ubuntu images.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright and Chromium
+        run: npm install --no-save --no-package-lock playwright@1.55.0 && npx playwright install --with-deps chromium
+      - name: Smoke test (real data)
+        run: node scripts/smoke-test.mjs
+      - name: Smoke test (fixture)
+        run: node scripts/smoke-test.mjs --fixture

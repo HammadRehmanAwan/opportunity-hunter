@@ -2,7 +2,7 @@
 
 A single-page site that lists **open Forward Deployed AI Engineer roles**, the **people to approach at each company** (with LinkedIn profiles and verified or best-guess email addresses), and a **drafted email plus LinkedIn message you can send with one click**. It follows the same shape as the WYA client-hunting pipeline: *scan → filter → enrich → score → gate → outreach*.
 
-No build step, no server, no accounts. Your approvals, notes and edited drafts are stored in your browser only.
+No build step, no server, no accounts. On the site itself, your progress, notes and edited drafts are stored in your browser only. The private Claude page version (see Deploy) also saves them to your Claude account.
 
 ## Run it
 
@@ -22,11 +22,20 @@ npx serve .          # or: python3 -m http.server 8080
 
 ## Deploy
 
-Pushing to this repo only runs **Validate data** (`.github/workflows/ci.yml`), which checks the data and that `data/opportunities.js` is up to date. Nothing is published automatically.
+Pushing to this repo only runs **Validate data** (`.github/workflows/ci.yml`): it checks the data and that `data/opportunities.js` is up to date, and runs the headless browser smoke test on the real data and the fixture. Nothing is published automatically.
 
 - **Use it privately (recommended)**: clone the repo and open `index.html` in a browser.
 - **GitHub Pages**: run **Deploy to GitHub Pages** by hand from the Actions tab. Pages needs a public repo or a paid plan, and the site it creates is public.
 - **Netlify**: `netlify.toml` is included. Connect the repo and turn on password protection before sharing the link.
+- **As a private Claude page**: `node scripts/build-artifact.mjs` writes `dist/opportunity-hunter.html`, one file with the styles, data and app inlined, ready to publish as a claude.ai artifact (with the `db`, `user` and `downloads` capabilities). Only you can open it unless you share it. On that page:
+  - progress, notes, edits and your details are also saved to your own private space in the artifact, so they follow you to other devices. The roles appear once your saved progress has loaded, usually in under a second;
+  - the browser keeps a separate copy for each Claude account, so two accounts on one computer don't see each other's progress, and tabs open on the same account show each other's changes;
+  - a change that hasn't reached your account yet (say the tab closed straight after it) is kept in the browser and uploaded the next time the page opens. Something cleared on another device stays cleared, unless this browser had changed that role and not sent it yet; then the change is kept. When the same role was changed in two places, the later change to that role wins as a whole, so notes typed in one place can be replaced by a status change made later in the other;
+  - if the page can't reach your Claude account, it says so. With a copy already in this browser it carries on from that copy, and reloading the page once the account is back sends the changes. Otherwise changes last only until you close the page;
+  - progress saved without an account id by an earlier version of the page is deleted from the browser, not imported (that version had already uploaded it to its owner's account);
+  - email defaults to Gmail in the browser, because email-app (`mailto:`) links often don't open from a Claude page;
+  - CSV and backup files go through Claude's save prompt;
+  - *Clear everything* needs a second, separate click, because the page can't show a confirmation dialog. It clears progress, notes and edited messages; Your details are kept.
 
 ## How the one-click actions work
 
@@ -36,7 +45,7 @@ Pushing to this repo only runs **Validate data** (`.github/workflows/ci.yml`), w
 | **Copy note & open LinkedIn ↗** | Copies the connection note (≤ 300 chars) to the clipboard and opens the person's LinkedIn profile so you can paste it under *Connect → Add a note*. |
 | **Copy message & open LinkedIn ↗** | Same, for a longer message / InMail. |
 | **Draft to &lt;name&gt;** | Switches the outreach drafts to that contact and fills `{{first_name}}`, `{{contact_title}}` etc. |
-| **Your profile** | Your name, email, LinkedIn, CV link and signature, used in every draft. Defaults come from `data/profile.json` (which is published with the site); edits are saved in this browser only. |
+| **Your profile** | Your name, email, LinkedIn, CV link and signature, used in every draft. Defaults come from `data/profile.json` (which is published with the site); edits are saved in this browser, and on the private Claude page also to your Claude account. |
 | **Export CSV** | One row per contact for the currently filtered list, including status and notes. |
 
 Nothing is sent automatically.

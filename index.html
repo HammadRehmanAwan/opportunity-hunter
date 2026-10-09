@@ -125,7 +125,7 @@
         <li><b>Checked</b> each job, person and email again through search, and labelled what couldn't be confirmed.</li>
         <li><b>Scored</b> each role 1 to 10 for you, wrote the messages, then had an editor check them against your real experience.</li>
       </ol>
-      <p class="fine">Nothing is sent for you. "Send email" opens your own email app, and the LinkedIn buttons copy the message and open the profile. Your progress, notes and edits stay in this browser only.</p>
+      <p class="fine">Nothing is sent for you. "Send email" opens your own email app, and the LinkedIn buttons copy the message and open the profile. Your progress, notes and edits are saved <span class="saved-where">in this browser only</span>.</p>
     </details>
   </section>
 </main>
@@ -144,7 +144,7 @@
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
   </div>
-  <p class="fine">These fill in your name, links and signature in every message. Saved in this browser only.</p>
+  <p class="fine">These fill in your name, links and signature in every message. Saved <span class="saved-where">in this browser only</span>.</p>
   <form id="profile-form" class="form">
     <label>Full name<input name="name" type="text" required></label>
     <label>Email<input name="email" type="email" required></label>
@@ -278,8 +278,8 @@
             <label>Subject<input class="d-subject" type="text"></label>
             <label>Message<textarea class="d-email" rows="12"></textarea></label>
             <div class="row">
-              <button type="button" class="btn btn-primary act-send"><span class="send-label">Open in your email app</span>
-                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></button>
+              <a class="btn btn-primary act-send" href="#"><span class="send-label">Open in your email app</span>
+                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
               <button type="button" class="btn btn-ghost act-copy-email">Copy</button>
               <button type="button" class="btn btn-link act-reset" data-field="email" hidden>Undo my edits</button>
             </div>
@@ -287,8 +287,8 @@
           <div class="pane" data-pane="note" hidden>
             <label>Invite note <span class="count note-count"></span><textarea class="d-note" rows="4" maxlength="300"></textarea></label>
             <div class="row">
-              <button type="button" class="btn btn-primary act-linkedin" data-kind="note">Copy and open LinkedIn
-                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></button>
+              <a class="btn btn-primary act-linkedin" data-kind="note" href="https://www.linkedin.com/" target="_blank" rel="noopener">Copy and open LinkedIn
+                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
               <button type="button" class="btn btn-link act-reset" data-field="note" hidden>Undo my edits</button>
             </div>
             <p class="fine">On their profile, press <b>Connect</b>, then <b>Add a note</b>, then paste. LinkedIn allows up to 300 characters.</p>
@@ -296,8 +296,8 @@
           <div class="pane" data-pane="inmail" hidden>
             <label>Message<textarea class="d-inmail" rows="9"></textarea></label>
             <div class="row">
-              <button type="button" class="btn btn-primary act-linkedin" data-kind="inmail">Copy and open LinkedIn
-                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></button>
+              <a class="btn btn-primary act-linkedin" data-kind="inmail" href="https://www.linkedin.com/" target="_blank" rel="noopener">Copy and open LinkedIn
+                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
               <button type="button" class="btn btn-link act-reset" data-field="inmail" hidden>Undo my edits</button>
             </div>
             <p class="fine">Use this once you're connected, or send it as an InMail. Press <b>Message</b> on their profile and paste.</p>
