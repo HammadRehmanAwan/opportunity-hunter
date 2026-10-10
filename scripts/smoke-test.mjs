@@ -251,7 +251,8 @@ check((await notContacted()) === total, 'Clear everything: answering OK clears p
 // before the default changed: the page shows, sends and copies the current link instead.
 const cvCase = await page.evaluate(() => {
   const p = window.OH_PROFILE || {}; const o = (window.OH_DATA || []).find((r) => (r.contacts || []).length);
-  return p.cv_url && (p.retired_cv_urls || [])[0] && o ? { old: p.retired_cv_urls[0], cv: p.cv_url, id: o.id } : null;
+  const old = [...(p.retired_cv_urls || [])].sort((a, b) => b.length - a.length)[0];
+  return p.cv_url && old && o ? { old, cv: p.cv_url, id: o.id } : null;
 });
 check(!!cvCase, '(setup) a retired CV link and a role with a contact');
 if (cvCase) {
@@ -276,8 +277,9 @@ if (cvCase) {
   await page.click('#btn-profile');
   check((await page.inputValue('#profile-form input[name="cv_url"]')) === cvCase.cv && !(await page.inputValue('#profile-form textarea[name="signature"]')).includes(cvCase.old), 'Your details shows the current CV link');
   await page.keyboard.press('Escape');
-  const stored = await page.evaluate(() => localStorage.getItem('oh:profile:v1') + localStorage.getItem('oh:tracker:v1'));
-  check(stored.includes(cvCase.old), 'showing the current link leaves what is stored as it was');
+  const storedProfile = await page.evaluate(() => JSON.parse(localStorage.getItem('oh:profile:v1') || '{}'));
+  const storedTracker = await page.evaluate(() => localStorage.getItem('oh:tracker:v1') || '');
+  check(storedProfile.cv_url === cvCase.old && String(storedProfile.signature).includes(cvCase.old) && storedTracker.includes(cvCase.old), 'showing the current link leaves the stored details and edited messages as they were'); 
 }
 
 // ---------- Inside the claude.ai artifact viewer ----------
@@ -677,7 +679,8 @@ check(/Backup restored/.test(await vpage.locator('#toast').innerText()) && (awai
 await vpage.click('#btn-drawer-close');
 
 // Details saved to the account before the default CV link changed: the page gives the current link.
-const vcv = await vpage.evaluate(() => { const p = window.OH_PROFILE || {}; return { old: (p.retired_cv_urls || [])[0], cv: p.cv_url }; });
+const vcv = await vpage.evaluate(() => { const p = window.OH_PROFILE || {}; return { old: [...(p.retired_cv_urls || [])].sort((a, b) => b.length - a.length)[0], cv: p.cv_url }; });
+check(!!(vcv.old && vcv.cv), '(setup) viewer: a retired CV link to save in the account');
 if (vcv.old && vcv.cv) {
   await editAccount('data/users/viewer1/profile', { cv_url: vcv.old, signature: `Sig\n${vcv.old}`, u: Date.now() + 60000 });
   await reload();
@@ -685,8 +688,8 @@ if (vcv.old && vcv.cv) {
   await vc.locator('.btn-write').click();
   const vcEmail = await vc.locator('.d-email').inputValue();
   await vpage.click('#btn-profile');
-  check(vcEmail.includes(vcv.cv) && !vcEmail.includes(vcv.old) && (await vpage.inputValue('#profile-form input[name="cv_url"]')) === vcv.cv && (await accountProfile())?.cv_url === vcv.old,
-    'viewer: account details with a retired CV link give the current link');
+  check(vcEmail.includes(vcv.cv) && !vcEmail.includes(vcv.old) && (await vpage.inputValue('#profile-form input[name="cv_url"]')) === vcv.cv && (await accountProfile())?.cv_url === vcv.old && String((await accountProfile())?.signature).includes(vcv.old),
+    'viewer: account details with a retired CV link give the current link and stay as saved');
   await vpage.click('#btn-drawer-close');
 }
 

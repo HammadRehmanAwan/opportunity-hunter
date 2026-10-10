@@ -193,7 +193,7 @@
   // link, so it is shown, copied and sent as the current default link instead. What is stored stays as it was.
   function currentLinks(text) {
     const cv = DEFAULT_PROFILE.cv_url; let t = String(text ?? '');
-    if (isHttp(cv)) RETIRED_CV_URLS.forEach((u) => { if (typeof u === 'string' && isHttp(u) && !cv.includes(u)) t = t.split(u).join(cv); });
+    if (isHttp(cv)) [...RETIRED_CV_URLS].sort((a, b) => String(b).length - String(a).length).forEach((u) => { if (typeof u === 'string' && isHttp(u) && !cv.includes(u)) t = t.split(u).join(cv); });
     return t;
   }
 
