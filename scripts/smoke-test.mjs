@@ -63,6 +63,20 @@ check(await page.locator('.card .details').first().isHidden(), 'cards start coll
 check(await page.locator('.card .composer').first().isHidden(), 'cards start collapsed (composer hidden)');
 check(/Write to|Write a message/.test(await page.locator('.card .btn-write').first().innerText()), 'each card offers a Write button');
 
+// Every role links to LinkedIn: the exact posting when the data has one, else a search for it.
+const liLinks = await page.evaluate(() => Array.from(document.querySelectorAll('.card')).map((c) => {
+  const a = c.querySelector('.li-job-link'); const d = (window.OH_DATA || []).find((o) => o.id === c.dataset.id) || {};
+  return { href: a ? a.getAttribute('href') : '', text: a ? a.textContent.trim() : '', target: a ? a.target : '', title: a ? a.title : '', exact: d.linkedin_job_url || '', company: d.company || '', role: d.role_title || '' };
+}));
+check(liLinks.length === total && liLinks.every((l) => /^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/jobs\//.test(l.href) && l.target === '_blank'), 'every role links to LinkedIn jobs');
+const liExact = liLinks.filter((l) => l.exact), liSearch = liLinks.filter((l) => !l.exact);
+check(liExact.every((l) => l.href === l.exact && l.text === 'LinkedIn job' && /\/jobs\/view\//.test(l.href)), `a role with a confirmed LinkedIn posting links straight to it (${liExact.length})`);
+check(!useFixture || liExact.length >= 1, '(setup) the fixture has a role with an exact LinkedIn posting');
+const kw = (l) => decodeURIComponent((l.href.split('keywords=')[1] || '').replace(/\+/g, ' '));
+check(liSearch.every((l) => l.text === 'Find on LinkedIn' && /^https:\/\/www\.linkedin\.com\/jobs\/search\/\?keywords=[^&]+$/.test(l.href) && /search, not a confirmed posting/.test(l.title)), `the others open a LinkedIn Jobs search and say so (${liSearch.length})`);
+const bare = (s) => s.replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+check(liSearch.every((l) => !/[()]/.test(kw(l)) && kw(l) === `${bare(l.company)} ${bare(l.role)}`.trim()), 'the search is for the company and the role, without bracketed notes');
+
 // Region chips filter and toggle aria-pressed
 await page.click('#regions .chip[data-region="UK"]');
 const ukCount = await page.locator('.card').count();
@@ -163,6 +177,7 @@ check(['dark', 'light'].includes(await page.evaluate(() => document.documentElem
 const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-export')]);
 const csv = await (await dl.createReadStream()).toArray().then((b) => Buffer.concat(b).toString());
 check(csv.split('\n').length > 1 && csv.startsWith('company,role,'), 'CSV export has a header and rows');
+check(csv.split('\n')[0].split(',').includes('linkedin_job') && /https:\/\/([a-z]{2,3}\.)?linkedin\.com\/jobs\//.test(csv.split('\n')[1]), 'CSV has a LinkedIn job link on each row');
 check(!/(^|,)[=+\-@]/m.test(csv.split('\n').slice(1).join('\n')), 'CSV cells never start with a formula character');
 // Injection attempt in data must be escaped, not executed
 const xss = await page.evaluate(() => document.querySelector('#xss-canary') !== null);

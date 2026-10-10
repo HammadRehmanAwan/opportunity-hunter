@@ -311,6 +311,14 @@
   const matchLabel = (n) => (n == null ? 'Not scored' : n >= 8 ? 'Great match' : n >= 6 ? 'Good match' : n >= 4 ? 'Worth a look' : 'Long shot');
   const scoreClass = (n) => (n == null ? 's-none' : n >= 8 ? 's-high' : n >= 6 ? 's-mid' : 's-low');
   const peopleSearchUrl = (o) => (isHttp(o.linkedin_people_search_url) ? o.linkedin_people_search_url : `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${o.company} forward deployed engineer OR recruiter OR head of engineering`)}`);
+  // The role on LinkedIn: the exact posting when one has been confirmed (linkedin_job_url), otherwise
+  // a LinkedIn Jobs search for the company and role title, which is a search and not a posting.
+  const LI_JOB = /^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/jobs\/view\//i;
+  function linkedinJob(o) {
+    if (LI_JOB.test(o.linkedin_job_url || '')) return { url: o.linkedin_job_url, exact: true };
+    const bare = (s) => String(s || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+    return { url: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(`${bare(o.company)} ${bare(o.role_title)}`.trim())}`, exact: false };
+  }
   const jobStatus = (o) => { const v = o.verification || {}; return v.job_status || (v.job_url_live === true ? 'listed_recently' : 'unconfirmed'); };
   const workLabel = { remote: 'Remote', hybrid: 'Hybrid', onsite: 'In the office' };
 
@@ -364,6 +372,10 @@
     const job = $('.job-link', el);
     if (isHttp(o.job_url)) job.href = o.job_url;
     else job.replaceWith(Object.assign(document.createElement('span'), { className: 'pill pill-warn', textContent: 'No job link' }));
+    const li = linkedinJob(o), liLink = $('.li-job-link', el);
+    liLink.href = li.url;
+    liLink.firstChild.textContent = li.exact ? 'LinkedIn job' : 'Find on LinkedIn';
+    liLink.title = li.exact ? 'The job posting on LinkedIn' : 'Opens a LinkedIn Jobs search for this company and role. It is a search, not a confirmed posting.';
 
     const st = $('.status', el); st.value = s.status; st.setAttribute('aria-label', `Progress for ${o.company}`);
     st.addEventListener('change', () => {
@@ -617,11 +629,11 @@
     else if (result === null) toast('Download started. If no file appears, this page can\'t save files.', 'alert');
   }
   const exportCsv = async () => {
-    const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
+    const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'linkedin_job', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
     const rows = [head.join(',')];
     visible().forEach((o) => {
       const s = state(o.id); const cs = (o.contacts && o.contacts.length) ? o.contacts : [{}];
-      cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, c.name, c.title, c.role_type, c.verified === true ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
+      cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, linkedinJob(o).url, c.name, c.title, c.role_type, c.verified === true ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
     });
     toastSaved(await download('opportunity-hunter.csv', rows.join('\n'), 'text/csv'), `Saved ${rows.length - 1} rows as CSV`);
   };

@@ -46,7 +46,8 @@ Pushing to this repo only runs **Validate data** (`.github/workflows/ci.yml`): i
 | **Copy message & open LinkedIn ↗** | Same, for a longer message / InMail. |
 | **Draft to &lt;name&gt;** | Switches the outreach drafts to that contact and fills `{{first_name}}`, `{{contact_title}}` etc. |
 | **Your profile** | Your name, email, LinkedIn, CV link and signature, used in every draft. Defaults come from `data/profile.json` (which is published with the site); edits are saved in this browser, and on the private Claude page also to your Claude account. |
-| **Export CSV** | One row per contact for the currently filtered list, including status and notes. |
+| **LinkedIn job ↗** or **Find on LinkedIn ↗** | On each role, next to *View job*. When the role's own LinkedIn posting is known (`linkedin_job_url`) it opens that posting. Otherwise it opens a LinkedIn Jobs search for the company and role, which is a search and not a confirmed posting; its tooltip says so. |
+| **Export CSV** | One row per contact for the currently filtered list, including status, notes and the LinkedIn job link. |
 
 Nothing is sent automatically.
 
@@ -63,7 +64,7 @@ Nothing is sent automatically.
 ```
 id (stable slug, required — tracker state is keyed by it),
 company, company_url, linkedin_company_url, hq, size_text, what_they_do, fde_team_context,
-role_title, location, region (UK|Europe|Remote|US|Other), remote_policy (remote|hybrid|onsite|unknown), job_url, posted_or_seen,
+role_title, location, region (UK|Europe|Remote|US|Other), remote_policy (remote|hybrid|onsite|unknown), job_url, linkedin_job_url (optional: a linkedin.com/jobs/view/ link to the posting itself), posted_or_seen,
 employment_type, salary_text, summary, why_fde,
 score (1-10), rationale, suggested_contact, outreach_angle, fit_summary, watch_outs[] (plain-language versions shown on the cards),
 careers_email, careers_email_source_url, email_pattern, email_pattern_confidence, email_pattern_source_url,
@@ -74,6 +75,8 @@ verification: { job_status (live_fetched|listed_recently|unconfirmed|closed), jo
 ```
 
 Placeholders available in drafts: `{{first_name}}`, `{{contact_name}}`, `{{contact_title}}`, `{{company}}`, `{{role}}`, `{{my_name}}`, `{{my_first_name}}`, `{{my_email}}`, `{{my_linkedin}}`, `{{my_phone}}`, `{{my_cv}}`, `{{my_headline}}`, `{{signature}}`.
+
+`data/profile.json` holds the default details used in every draft. If the CV link (`cv_url`) ever changes, put the old link in `retired_cv_urls`: details and edited messages saved with an old link then show, copy and send the current one (what is saved is left as it was), and `build-data.mjs` fails if a draft or the signature hard-codes a retired link.
 
 To refresh the list, re-run the research (the discovery / enrichment / verification prompts are described on the page), update the JSON and run:
 

@@ -13,7 +13,7 @@ const REQUIRED = ['id', 'company', 'role_title', 'job_url', 'score', 'region'];
 const REGIONS = new Set(['UK', 'Europe', 'Remote', 'US', 'Other']);
 const REMOTE = new Set(['remote', 'hybrid', 'onsite', 'unknown']);
 const EMAIL_STATUS = { verified_public: 'verified_public', pattern_guess: 'pattern_guess', published: 'verified_public', guess: 'pattern_guess' };
-const URL_FIELDS = ['job_url', 'company_url', 'careers_url', 'linkedin_company_url', 'linkedin_people_search_url', 'careers_email_source_url', 'email_pattern_source_url'];
+const URL_FIELDS = ['job_url', 'linkedin_job_url', 'company_url', 'careers_url', 'linkedin_company_url', 'linkedin_people_search_url', 'careers_email_source_url', 'email_pattern_source_url'];
 const isHttp = (u) => /^https?:\/\//i.test(u);
 const isEmail = (e) => /^[^\s@,;:<>?&"'()[\]\\]+@[^\s@,;:<>?&"'()[\]\\/]+\.[a-z]{2,}$/i.test(e);
 const errors = [];
@@ -30,6 +30,7 @@ src.opportunities.forEach((o, i) => {
   if (o.remote_policy !== undefined) { const r = String(o.remote_policy).toLowerCase().replace(/[^a-z]/g, ''); if (r === 'onsite' || r === 'remote' || r === 'hybrid' || r === 'unknown') o.remote_policy = r; else errors.push(`${who}: remote_policy must be remote|hybrid|onsite|unknown`); }
   if (typeof o.score !== 'number' || o.score < 1 || o.score > 10) errors.push(`${who}: score must be a number 1-10`);
   URL_FIELDS.forEach((k) => { if (o[k] && !isHttp(o[k])) errors.push(`${who}: ${k} must start with http(s)://`); });
+  if (o.linkedin_job_url && !/^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/jobs\/view\//i.test(o.linkedin_job_url)) errors.push(`${who}: linkedin_job_url must be a linkedin.com/jobs/view/ posting link`);
   if (o.careers_email && !isEmail(o.careers_email)) errors.push(`${who}: careers_email is not an email address`);
   if (o.verification && typeof o.verification.job_url_live !== 'boolean') errors.push(`${who}: verification.job_url_live must be true/false`);
   if (o.verification && o.verification.job_status !== undefined && !['live_fetched', 'listed_recently', 'unconfirmed', 'closed'].includes(o.verification.job_status)) errors.push(`${who}: verification.job_status must be live_fetched|listed_recently|unconfirmed|closed`);
