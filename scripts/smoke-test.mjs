@@ -63,6 +63,20 @@ check(await page.locator('.card .details').first().isHidden(), 'cards start coll
 check(await page.locator('.card .composer').first().isHidden(), 'cards start collapsed (composer hidden)');
 check(/Write to|Write a message/.test(await page.locator('.card .btn-write').first().innerText()), 'each card offers a Write button');
 
+// Every role links to LinkedIn: the exact posting when the data has one, else a search for it.
+const liLinks = await page.evaluate(() => Array.from(document.querySelectorAll('.card')).map((c) => {
+  const a = c.querySelector('.li-job-link'); const d = (window.OH_DATA || []).find((o) => o.id === c.dataset.id) || {};
+  return { href: a ? a.getAttribute('href') : '', text: a ? a.textContent.trim() : '', target: a ? a.target : '', title: a ? a.title : '', exact: d.linkedin_job_url || '', company: d.company || '', role: d.role_title || '' };
+}));
+check(liLinks.length === total && liLinks.every((l) => /^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/jobs\//.test(l.href) && l.target === '_blank'), 'every role links to LinkedIn jobs');
+const liExact = liLinks.filter((l) => l.exact), liSearch = liLinks.filter((l) => !l.exact);
+check(liExact.every((l) => l.href === l.exact && l.text === 'LinkedIn job' && /\/jobs\/view\//.test(l.href)), `a role with a confirmed LinkedIn posting links straight to it (${liExact.length})`);
+check(!useFixture || liExact.length >= 1, '(setup) the fixture has a role with an exact LinkedIn posting');
+const kw = (l) => decodeURIComponent((l.href.split('keywords=')[1] || '').replace(/\+/g, ' '));
+check(liSearch.every((l) => l.text === 'Find on LinkedIn' && /^https:\/\/www\.linkedin\.com\/jobs\/search\/\?keywords=[^&]+$/.test(l.href) && /search, not a confirmed posting/.test(l.title)), `the others open a LinkedIn Jobs search and say so (${liSearch.length})`);
+const bare = (s) => s.replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+check(liSearch.every((l) => !/[()]/.test(kw(l)) && kw(l) === `${bare(l.company)} ${bare(l.role)}`.trim()), 'the search is for the company and the role, without bracketed notes');
+
 // Region chips filter and toggle aria-pressed
 await page.click('#regions .chip[data-region="UK"]');
 const ukCount = await page.locator('.card').count();
@@ -163,6 +177,7 @@ check(['dark', 'light'].includes(await page.evaluate(() => document.documentElem
 const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-export')]);
 const csv = await (await dl.createReadStream()).toArray().then((b) => Buffer.concat(b).toString());
 check(csv.split('\n').length > 1 && csv.startsWith('company,role,'), 'CSV export has a header and rows');
+check(csv.split('\n')[0].split(',').includes('linkedin_job') && /https:\/\/([a-z]{2,3}\.)?linkedin\.com\/jobs\//.test(csv.split('\n')[1]), 'CSV has a LinkedIn job link on each row');
 check(!/(^|,)[=+\-@]/m.test(csv.split('\n').slice(1).join('\n')), 'CSV cells never start with a formula character');
 // Injection attempt in data must be escaped, not executed
 const xss = await page.evaluate(() => document.querySelector('#xss-canary') !== null);
@@ -231,6 +246,41 @@ check((await notContacted()) < total, 'Clear everything: answering Cancel clears
 page.once('dialog', (d) => d.accept());
 await page.click('#btn-wipe');
 check((await notContacted()) === total, 'Clear everything: answering OK clears progress');
+
+// A retired CV link (profile.retired_cv_urls) can still be in details saved, or a message edited,
+// before the default changed: the page shows, sends and copies the current link instead.
+const cvCase = await page.evaluate(() => {
+  const p = window.OH_PROFILE || {}; const o = (window.OH_DATA || []).find((r) => (r.contacts || []).length);
+  const old = [...(p.retired_cv_urls || [])].sort((a, b) => b.length - a.length)[0];
+  return p.cv_url && old && o ? { old, cv: p.cv_url, id: o.id } : null;
+});
+check(!!cvCase, '(setup) a retired CV link and a role with a contact');
+if (cvCase) {
+  await page.evaluate((c) => {
+    localStorage.setItem('oh:profile:v1', JSON.stringify({ name: 'Old Saver', cv_url: c.old, signature: `Old Saver\nCV: ${c.old}` }));
+    localStorage.setItem('oh:tracker:v1', JSON.stringify({ [c.id]: { status: 'shortlisted', notes: '', contact: 0, drafts: { 0: { linkedin_inmail: `Edited before the change. CV: ${c.old}` } } } }));
+  }, cvCase);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.evaluate(() => document.querySelector('#btn-clear').click());
+  const cc = page.locator(`.card[data-id="${cvCase.id}"]`);
+  await cc.locator('.btn-write').click();
+  const ccEmail = await cc.locator('.d-email').inputValue();
+  check(ccEmail.includes(cvCase.cv) && !ccEmail.includes(cvCase.old), 'saved details with a retired CV link: the email gives the current link');
+  const ccHref = await cc.locator('.act-send').getAttribute('href');
+  check(ccHref.includes(encodeURIComponent(cvCase.cv)) && !ccHref.includes(encodeURIComponent(cvCase.old)), 'the send link carries the current CV link');
+  await cc.locator('.tab[data-tab="inmail"]').click();
+  const ccInmail = await cc.locator('.d-inmail').inputValue();
+  check(ccInmail.startsWith('Edited before the change.') && ccInmail.includes(cvCase.cv) && !ccInmail.includes(cvCase.old), 'a message edited before the change shows the current CV link');
+  await cc.locator('.act-linkedin[data-kind="inmail"]').click();
+  const ccClip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+  check(ccClip === ccInmail, 'copying that message copies the current CV link');
+  await page.click('#btn-profile');
+  check((await page.inputValue('#profile-form input[name="cv_url"]')) === cvCase.cv && !(await page.inputValue('#profile-form textarea[name="signature"]')).includes(cvCase.old), 'Your details shows the current CV link');
+  await page.keyboard.press('Escape');
+  const storedProfile = await page.evaluate(() => JSON.parse(localStorage.getItem('oh:profile:v1') || '{}'));
+  const storedTracker = await page.evaluate(() => localStorage.getItem('oh:tracker:v1') || '');
+  check(storedProfile.cv_url === cvCase.old && String(storedProfile.signature).includes(cvCase.old) && storedTracker.includes(cvCase.old), 'showing the current link leaves the stored details and edited messages as they were'); 
+}
 
 // ---------- Inside the claude.ai artifact viewer ----------
 // A fake window.claude. Its account store lives in a test-only localStorage key and is read and
@@ -627,6 +677,21 @@ await vpage.locator('#file-restore').setInputFiles({ name: 'backup.json', mimeTy
 await waitAccount(vfirstId, 'replied');
 check(/Backup restored/.test(await vpage.locator('#toast').innerText()) && (await statusOf(vfirstId)) === 'replied' && (await accountDoc(vfirstId))?.status === 'replied', 'viewer: restoring a backup brings the progress back, here and in the account');
 await vpage.click('#btn-drawer-close');
+
+// Details saved to the account before the default CV link changed: the page gives the current link.
+const vcv = await vpage.evaluate(() => { const p = window.OH_PROFILE || {}; return { old: [...(p.retired_cv_urls || [])].sort((a, b) => b.length - a.length)[0], cv: p.cv_url }; });
+check(!!(vcv.old && vcv.cv), '(setup) viewer: a retired CV link to save in the account');
+if (vcv.old && vcv.cv) {
+  await editAccount('data/users/viewer1/profile', { cv_url: vcv.old, signature: `Sig\n${vcv.old}`, u: Date.now() + 60000 });
+  await reload();
+  const vc = vpage.locator('.card').last();
+  await vc.locator('.btn-write').click();
+  const vcEmail = await vc.locator('.d-email').inputValue();
+  await vpage.click('#btn-profile');
+  check(vcEmail.includes(vcv.cv) && !vcEmail.includes(vcv.old) && (await vpage.inputValue('#profile-form input[name="cv_url"]')) === vcv.cv && (await accountProfile())?.cv_url === vcv.old && String((await accountProfile())?.signature).includes(vcv.old),
+    'viewer: account details with a retired CV link give the current link and stay as saved');
+  await vpage.click('#btn-drawer-close');
+}
 
 await vctx.close();
 

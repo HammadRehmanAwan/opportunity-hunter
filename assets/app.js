@@ -66,6 +66,8 @@
     name: 'Your name', email: 'you@example.com', phone: '', linkedin: '', cv_url: '', headline: '',
     mail_client: 'mailto', signature: '',
   }, window.OH_PROFILE || {});
+  // CV links the defaults used to give (see currentLinks). They are not a detail you can edit.
+  const RETIRED_CV_URLS = [].concat(DEFAULT_PROFILE.retired_cv_urls || []); delete DEFAULT_PROFILE.retired_cv_urls;
   // mailto: links often do nothing inside the artifact viewer, so default to Gmail there.
   if (HOST && DEFAULT_PROFILE.mail_client === 'mailto') DEFAULT_PROFILE.mail_client = 'gmail';
 
@@ -185,7 +187,14 @@
       my_linkedin: profile.linkedin || '', my_phone: profile.phone || '', my_cv: profile.cv_url || '', my_headline: profile.headline || '',
       signature: profile.signature || profile.name || '',
     };
-    return String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (Object.hasOwn(map, k) ? map[k] : m));
+    return currentLinks(String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (Object.hasOwn(map, k) ? map[k] : m)));
+  }
+  // Details saved, and messages edited, before the default CV link changed can still hold a retired
+  // link, so it is shown, copied and sent as the current default link instead. What is stored stays as it was.
+  function currentLinks(text) {
+    const cv = DEFAULT_PROFILE.cv_url; let t = String(text ?? '');
+    if (isHttp(cv)) [...RETIRED_CV_URLS].sort((a, b) => String(b).length - String(a).length).forEach((u) => { if (typeof u === 'string' && isHttp(u) && !cv.includes(u)) t = t.split(u).join(cv); });
+    return t;
   }
 
   // Edited messages are stored per role AND per recipient, so switching person falls back to the template.
@@ -302,6 +311,14 @@
   const matchLabel = (n) => (n == null ? 'Not scored' : n >= 8 ? 'Great match' : n >= 6 ? 'Good match' : n >= 4 ? 'Worth a look' : 'Long shot');
   const scoreClass = (n) => (n == null ? 's-none' : n >= 8 ? 's-high' : n >= 6 ? 's-mid' : 's-low');
   const peopleSearchUrl = (o) => (isHttp(o.linkedin_people_search_url) ? o.linkedin_people_search_url : `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${o.company} forward deployed engineer OR recruiter OR head of engineering`)}`);
+  // The role on LinkedIn: the exact posting when one has been confirmed (linkedin_job_url), otherwise
+  // a LinkedIn Jobs search for the company and role title, which is a search and not a posting.
+  const LI_JOB = /^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/jobs\/view\//i;
+  function linkedinJob(o) {
+    if (LI_JOB.test(o.linkedin_job_url || '')) return { url: o.linkedin_job_url, exact: true };
+    const bare = (s) => String(s || '').replace(/\s*\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+    return { url: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(`${bare(o.company)} ${bare(o.role_title)}`.trim())}`, exact: false };
+  }
   const jobStatus = (o) => { const v = o.verification || {}; return v.job_status || (v.job_url_live === true ? 'listed_recently' : 'unconfirmed'); };
   const workLabel = { remote: 'Remote', hybrid: 'Hybrid', onsite: 'In the office' };
 
@@ -355,6 +372,10 @@
     const job = $('.job-link', el);
     if (isHttp(o.job_url)) job.href = o.job_url;
     else job.replaceWith(Object.assign(document.createElement('span'), { className: 'pill pill-warn', textContent: 'No job link' }));
+    const li = linkedinJob(o), liLink = $('.li-job-link', el);
+    liLink.href = li.url;
+    liLink.firstChild.textContent = li.exact ? 'LinkedIn job' : 'Find on LinkedIn';
+    liLink.title = li.exact ? 'The job posting on LinkedIn' : 'Opens a LinkedIn Jobs search for this company and role. It is a search, not a confirmed posting.';
 
     const st = $('.status', el); st.value = s.status; st.setAttribute('aria-label', `Progress for ${o.company}`);
     st.addEventListener('change', () => {
@@ -483,7 +504,7 @@
     function syncSendLink() { linkTo($('.act-send', el), mailLink(recipient().email, subj.value, body.value)); }
     function loadDrafts() {
       const c = current(); const k = key(); let anyEdited = false;
-      Object.entries(fields).forEach(([f, input]) => { const d = draft(o, k, f); input.value = d.edited ? d.text : fill(d.text, o, c); anyEdited = anyEdited || d.edited; });
+      Object.entries(fields).forEach(([f, input]) => { const d = draft(o, k, f); input.value = d.edited ? currentLinks(d.text) : fill(d.text, o, c); anyEdited = anyEdited || d.edited; });
       notes.value = s.notes || '';
       $$('.act-reset', el).forEach((b) => { b.hidden = !anyEdited; });
       countNote(el); refresh();
@@ -529,7 +550,7 @@
   const drawer = $('#drawer'), backdrop = $('#drawer-backdrop'), form = $('#profile-form');
   let lastFocus = null;
   const inertTargets = () => ['header.top', 'main', 'footer'].map((sel) => $(sel)).filter(Boolean);
-  function fillForm() { Object.entries(profile).forEach(([k, v]) => { const f = form.elements[k]; if (f) f.value = v ?? ''; }); }
+  function fillForm() { Object.entries(profile).forEach(([k, v]) => { const f = form.elements[k]; if (f) f.value = currentLinks(v); }); }
   function openDrawer() { fillForm(); delete form.dataset.dirty; lastFocus = document.activeElement; drawer.hidden = false; document.body.classList.add('drawer-open'); backdrop.hidden = false; inertTargets().forEach((n) => { n.inert = true; }); $('input[name="name"]', form).focus(); }
   function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; document.body.classList.remove('drawer-open'); if (closeDrawer.redraw) { closeDrawer.redraw = false; keepUI(renderList); } inertTargets().forEach((n) => { n.inert = false; }); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
   $('#btn-profile').addEventListener('click', openDrawer);
@@ -608,11 +629,11 @@
     else if (result === null) toast('Download started. If no file appears, this page can\'t save files.', 'alert');
   }
   const exportCsv = async () => {
-    const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
+    const head = ['company', 'role', 'location', 'region', 'remote', 'score', 'status', 'first_contact', 'job_url', 'linkedin_job', 'contact_name', 'contact_title', 'contact_role', 'contact_verified', 'linkedin_url', 'email', 'email_status', 'careers_email', 'email_pattern', 'rationale', 'outreach_angle', 'notes'];
     const rows = [head.join(',')];
     visible().forEach((o) => {
       const s = state(o.id); const cs = (o.contacts && o.contacts.length) ? o.contacts : [{}];
-      cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, c.name, c.title, c.role_type, c.verified === true ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
+      cs.forEach((c) => rows.push([o.company, o.role_title, o.location, o.region, o.remote_policy, o.score, s.status, s.contacted_at || '', o.job_url, linkedinJob(o).url, c.name, c.title, c.role_type, c.verified === true ? 'yes' : 'no', c.linkedin_url, c.email, c.email_status, o.careers_email, o.email_pattern, o.rationale, o.outreach_angle, s.notes].map(csvCell).join(',')));
     });
     toastSaved(await download('opportunity-hunter.csv', rows.join('\n'), 'text/csv'), `Saved ${rows.length - 1} rows as CSV`);
   };

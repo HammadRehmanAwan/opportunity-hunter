@@ -153,7 +153,7 @@ for (const c of partial.kept) {
     hq: clean(e && e.hq), size_text: clean(e && e.size_text), what_they_do: clean(e && e.what_they_do), fde_team_context: clean(e && e.fde_team_context),
     role_title: clean(role.role_title), location: clean(role.location),
     region: (dd && dd.region) || 'Other', remote_policy: (dd && dd.remote_policy) || (role.remote_policy || 'unknown'),
-    job_url, posted_or_seen: clean(role.posted_or_seen), employment_type: clean(role.employment_type), salary_text: clean(role.salary_text),
+    job_url, linkedin_job_url: [job_url, role.job_url, role.source_url].find((u) => /^https:\/\/([a-z]{2,3}\.)?linkedin\.com\/jobs\/view\//i.test(u || '')) || '', posted_or_seen: clean(role.posted_or_seen), employment_type: clean(role.employment_type), salary_text: clean(role.salary_text),
     summary: clean(role.summary), why_fde: clean(role.why_fde),
     other_roles: c.roles.slice(1, 6).map((r) => ({ role_title: clean(r.role_title), location: clean(r.location), job_url: publicUrl(r.job_url) })),
     score, rationale: clean(dd && dd.rationale), suggested_contact: clean(dd && dd.suggested_contact), outreach_angle: clean(dd && dd.outreach_angle), fit_notes: clean(dd && dd.fit_notes),
