@@ -232,6 +232,39 @@ page.once('dialog', (d) => d.accept());
 await page.click('#btn-wipe');
 check((await notContacted()) === total, 'Clear everything: answering OK clears progress');
 
+// A retired CV link (profile.retired_cv_urls) can still be in details saved, or a message edited,
+// before the default changed: the page shows, sends and copies the current link instead.
+const cvCase = await page.evaluate(() => {
+  const p = window.OH_PROFILE || {}; const o = (window.OH_DATA || []).find((r) => (r.contacts || []).length);
+  return p.cv_url && (p.retired_cv_urls || [])[0] && o ? { old: p.retired_cv_urls[0], cv: p.cv_url, id: o.id } : null;
+});
+check(!!cvCase, '(setup) a retired CV link and a role with a contact');
+if (cvCase) {
+  await page.evaluate((c) => {
+    localStorage.setItem('oh:profile:v1', JSON.stringify({ name: 'Old Saver', cv_url: c.old, signature: `Old Saver\nCV: ${c.old}` }));
+    localStorage.setItem('oh:tracker:v1', JSON.stringify({ [c.id]: { status: 'shortlisted', notes: '', contact: 0, drafts: { 0: { linkedin_inmail: `Edited before the change. CV: ${c.old}` } } } }));
+  }, cvCase);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.evaluate(() => document.querySelector('#btn-clear').click());
+  const cc = page.locator(`.card[data-id="${cvCase.id}"]`);
+  await cc.locator('.btn-write').click();
+  const ccEmail = await cc.locator('.d-email').inputValue();
+  check(ccEmail.includes(cvCase.cv) && !ccEmail.includes(cvCase.old), 'saved details with a retired CV link: the email gives the current link');
+  const ccHref = await cc.locator('.act-send').getAttribute('href');
+  check(ccHref.includes(encodeURIComponent(cvCase.cv)) && !ccHref.includes(encodeURIComponent(cvCase.old)), 'the send link carries the current CV link');
+  await cc.locator('.tab[data-tab="inmail"]').click();
+  const ccInmail = await cc.locator('.d-inmail').inputValue();
+  check(ccInmail.startsWith('Edited before the change.') && ccInmail.includes(cvCase.cv) && !ccInmail.includes(cvCase.old), 'a message edited before the change shows the current CV link');
+  await cc.locator('.act-linkedin[data-kind="inmail"]').click();
+  const ccClip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+  check(ccClip === ccInmail, 'copying that message copies the current CV link');
+  await page.click('#btn-profile');
+  check((await page.inputValue('#profile-form input[name="cv_url"]')) === cvCase.cv && !(await page.inputValue('#profile-form textarea[name="signature"]')).includes(cvCase.old), 'Your details shows the current CV link');
+  await page.keyboard.press('Escape');
+  const stored = await page.evaluate(() => localStorage.getItem('oh:profile:v1') + localStorage.getItem('oh:tracker:v1'));
+  check(stored.includes(cvCase.old), 'showing the current link leaves what is stored as it was');
+}
+
 // ---------- Inside the claude.ai artifact viewer ----------
 // A fake window.claude. Its account store lives in a test-only localStorage key and is read and
 // written on every call, so it survives reloads and is shared by tabs like the real one.
@@ -627,6 +660,20 @@ await vpage.locator('#file-restore').setInputFiles({ name: 'backup.json', mimeTy
 await waitAccount(vfirstId, 'replied');
 check(/Backup restored/.test(await vpage.locator('#toast').innerText()) && (await statusOf(vfirstId)) === 'replied' && (await accountDoc(vfirstId))?.status === 'replied', 'viewer: restoring a backup brings the progress back, here and in the account');
 await vpage.click('#btn-drawer-close');
+
+// Details saved to the account before the default CV link changed: the page gives the current link.
+const vcv = await vpage.evaluate(() => { const p = window.OH_PROFILE || {}; return { old: (p.retired_cv_urls || [])[0], cv: p.cv_url }; });
+if (vcv.old && vcv.cv) {
+  await editAccount('data/users/viewer1/profile', { cv_url: vcv.old, signature: `Sig\n${vcv.old}`, u: Date.now() + 60000 });
+  await reload();
+  const vc = vpage.locator('.card').last();
+  await vc.locator('.btn-write').click();
+  const vcEmail = await vc.locator('.d-email').inputValue();
+  await vpage.click('#btn-profile');
+  check(vcEmail.includes(vcv.cv) && !vcEmail.includes(vcv.old) && (await vpage.inputValue('#profile-form input[name="cv_url"]')) === vcv.cv && (await accountProfile())?.cv_url === vcv.old,
+    'viewer: account details with a retired CV link give the current link');
+  await vpage.click('#btn-drawer-close');
+}
 
 await vctx.close();
 

@@ -1,6 +1,6 @@
 // Fixture used by `node scripts/smoke-test.mjs --fixture` — fictional companies.
 window.OH_META = { generated_at: "2026-09-30T00:00:00Z" };
-window.OH_PROFILE = { name: "Fixture Person", email: "fixture@example.com", linkedin: "https://www.linkedin.com/in/fixture/", cv_url: "https://example.com/cv", headline: "AI engineer", mail_client: "mailto", signature: "Fixture Person" };
+window.OH_PROFILE = { name: "Fixture Person", email: "fixture@example.com", linkedin: "https://www.linkedin.com/in/fixture/", cv_url: "https://example.com/cv", retired_cv_urls: ["https://example.com/old-cv"], headline: "AI engineer", mail_client: "mailto", signature: "Fixture Person" };
 window.OH_DATA = [
   { id: "acme-1", company: "Acme Deploy", company_url: "https://example.com", role_title: "Forward Deployed Engineer", location: "London, UK", region: "UK", remote_policy: "hybrid", job_url: "https://example.com/jobs/1", score: 9, rationale: "Great fit.", why_fde: "Embeds with customers.", suggested_contact: "Head of FDE", outreach_angle: "n8n + Claude work", careers_email: "careers@example.com",
     contacts: [ { name: "Jane Example", title: "Head of Forward Deployed Engineering", role_type: "hiring_manager", linkedin_url: "https://www.linkedin.com/in/jane-example/", email: "jane@example.com", email_status: "verified_public", verified: true, why_them: "Runs the team." } ],

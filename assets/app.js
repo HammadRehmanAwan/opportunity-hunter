@@ -66,6 +66,8 @@
     name: 'Your name', email: 'you@example.com', phone: '', linkedin: '', cv_url: '', headline: '',
     mail_client: 'mailto', signature: '',
   }, window.OH_PROFILE || {});
+  // CV links the defaults used to give (see currentLinks). They are not a detail you can edit.
+  const RETIRED_CV_URLS = [].concat(DEFAULT_PROFILE.retired_cv_urls || []); delete DEFAULT_PROFILE.retired_cv_urls;
   // mailto: links often do nothing inside the artifact viewer, so default to Gmail there.
   if (HOST && DEFAULT_PROFILE.mail_client === 'mailto') DEFAULT_PROFILE.mail_client = 'gmail';
 
@@ -185,7 +187,14 @@
       my_linkedin: profile.linkedin || '', my_phone: profile.phone || '', my_cv: profile.cv_url || '', my_headline: profile.headline || '',
       signature: profile.signature || profile.name || '',
     };
-    return String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (Object.hasOwn(map, k) ? map[k] : m));
+    return currentLinks(String(tpl || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (Object.hasOwn(map, k) ? map[k] : m)));
+  }
+  // Details saved, and messages edited, before the default CV link changed can still hold a retired
+  // link, so it is shown, copied and sent as the current default link instead. What is stored stays as it was.
+  function currentLinks(text) {
+    const cv = DEFAULT_PROFILE.cv_url; let t = String(text ?? '');
+    if (isHttp(cv)) RETIRED_CV_URLS.forEach((u) => { if (typeof u === 'string' && isHttp(u) && !cv.includes(u)) t = t.split(u).join(cv); });
+    return t;
   }
 
   // Edited messages are stored per role AND per recipient, so switching person falls back to the template.
@@ -483,7 +492,7 @@
     function syncSendLink() { linkTo($('.act-send', el), mailLink(recipient().email, subj.value, body.value)); }
     function loadDrafts() {
       const c = current(); const k = key(); let anyEdited = false;
-      Object.entries(fields).forEach(([f, input]) => { const d = draft(o, k, f); input.value = d.edited ? d.text : fill(d.text, o, c); anyEdited = anyEdited || d.edited; });
+      Object.entries(fields).forEach(([f, input]) => { const d = draft(o, k, f); input.value = d.edited ? currentLinks(d.text) : fill(d.text, o, c); anyEdited = anyEdited || d.edited; });
       notes.value = s.notes || '';
       $$('.act-reset', el).forEach((b) => { b.hidden = !anyEdited; });
       countNote(el); refresh();
@@ -529,7 +538,7 @@
   const drawer = $('#drawer'), backdrop = $('#drawer-backdrop'), form = $('#profile-form');
   let lastFocus = null;
   const inertTargets = () => ['header.top', 'main', 'footer'].map((sel) => $(sel)).filter(Boolean);
-  function fillForm() { Object.entries(profile).forEach(([k, v]) => { const f = form.elements[k]; if (f) f.value = v ?? ''; }); }
+  function fillForm() { Object.entries(profile).forEach(([k, v]) => { const f = form.elements[k]; if (f) f.value = currentLinks(v); }); }
   function openDrawer() { fillForm(); delete form.dataset.dirty; lastFocus = document.activeElement; drawer.hidden = false; document.body.classList.add('drawer-open'); backdrop.hidden = false; inertTargets().forEach((n) => { n.inert = true; }); $('input[name="name"]', form).focus(); }
   function closeDrawer() { drawer.hidden = true; backdrop.hidden = true; document.body.classList.remove('drawer-open'); if (closeDrawer.redraw) { closeDrawer.redraw = false; keepUI(renderList); } inertTargets().forEach((n) => { n.inert = false; }); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
   $('#btn-profile').addEventListener('click', openDrawer);

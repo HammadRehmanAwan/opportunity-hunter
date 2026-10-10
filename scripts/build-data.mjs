@@ -56,6 +56,18 @@ src.opportunities.forEach((o, i) => {
   }
   if (d.email_subject && d.email_subject.length > 90) warnings.push(`${who}: email_subject is ${d.email_subject.length} chars (aim for <= 70)`);
 });
+// The CV link goes into every draft through {{my_cv}}. retired_cv_urls lists links it used to be;
+// the page shows the current cv_url wherever saved details or edited messages still hold one.
+if (profile.cv_url && !isHttp(profile.cv_url)) errors.push('data/profile.json: cv_url must be an http(s) link');
+if (profile.retired_cv_urls !== undefined) {
+  if (!Array.isArray(profile.retired_cv_urls) || !profile.retired_cv_urls.every((u) => typeof u === 'string' && isHttp(u))) errors.push('data/profile.json: retired_cv_urls must be a list of http(s) links');
+  else profile.retired_cv_urls.forEach((u) => {
+    if (!isHttp(profile.cv_url)) errors.push('data/profile.json: retired_cv_urls needs a cv_url to show instead');
+    else if (profile.cv_url.includes(u)) errors.push(`data/profile.json: retired link ${u} is part of cv_url`);
+    if (String(profile.signature || '').includes(u)) errors.push(`data/profile.json: signature still has the retired link ${u}`);
+    src.opportunities.forEach((o) => Object.entries(o.drafts || {}).forEach(([k, t]) => { if (String(t).includes(u)) errors.push(`${o.id}: ${k} still has the retired link ${u}; use {{my_cv}}`); }));
+  });
+}
 if (warnings.length) console.warn('Warnings:\n  ' + warnings.join('\n  '));
 if (errors.length) { console.error('Data validation failed:\n  ' + errors.join('\n  ')); process.exit(1); }
 
