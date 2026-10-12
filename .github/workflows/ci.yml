@@ -14,8 +14,8 @@ jobs:
           node-version: 20
       - name: Validate data and regenerate data/opportunities.js
         run: node scripts/build-data.mjs
-      - name: Fail if the committed data/opportunities.js is stale
-        run: git diff --exit-code -- data/opportunities.js
+      - name: Fail if the committed data/opportunities.js or data/cv.js is stale
+        run: git diff --exit-code -- data/opportunities.js data/cv.js
   smoke:
     # The headless browser test of the site, on the real data and on the fictional fixture,
     # including the Claude page behaviour with a fake window.claude.

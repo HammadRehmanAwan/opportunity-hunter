@@ -19,7 +19,7 @@ let body = pick(/<body[^>]*>([\s\S]*)<\/body>/i, '<body>')[1];
 
 // Inlined script text must not end the <script> element early.
 const inlineJs = (js) => js.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
-for (const src of ['data/opportunities.js', 'assets/app.js']) {
+for (const src of ['data/opportunities.js', 'data/cv.js', 'assets/app.js']) {
   const tag = `<script src="${src}"></script>`;
   if (!body.includes(tag)) throw new Error(`index.html: no ${tag}`);
   const js = inlineJs(await read(src));
