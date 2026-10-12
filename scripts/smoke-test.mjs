@@ -145,11 +145,32 @@ const cvGot = Buffer.concat(await (await cvDl.createReadStream()).toArray());
 check(cvDl.suggestedFilename() === 'Hammad_Rehman_CV.pdf' && cvGot.equals(cvFile) && cvGot.subarray(0, 5).toString() === '%PDF-', `Download CV gives the CV PDF, byte for byte (${cvGot.length} bytes)`);
 await card.locator('.act-send').click();
 check(/CV is attached/.test(await page.locator('#toast').innerText()), 'sending an email that says the CV is attached reminds you to add it');
+// The reminder must not block the next message: Copy, then Download CV straight away.
+const toastHas = (re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector('#toast').textContent), re.source, { timeout: 3000 }).then(() => true, () => false);
+await card.locator('.act-copy-email').click();
+check(await toastHas(/Email copied/), 'copying right after sending is acknowledged');
+await Promise.all([page.waitForEvent('download'), card.locator('.act-cv').click()]);
+check(await toastHas(/CV saved/), 'Download CV is acknowledged right after Copy, not swallowed by the reminder');
 const attachedBody = await card.locator('.d-email').inputValue();
 await card.locator('.d-email').fill(attachedBody.replace(/attach\w*/gi, 'included'));
 check(await card.locator('.cv-hint').isHidden(), 'the how-to-attach hint goes away when the message no longer says so');
 await card.locator('.act-reset[data-field="email"]').click();
 check((await card.locator('.d-email').inputValue()) === attachedBody && await card.locator('.cv-hint').isVisible(), 'undoing the edit brings the message and the hint back');
+
+// If the CV file is missing the page still works: no Download CV button, and "Write to <name>" still switches the person.
+const noCvPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const noCvErrors = [];
+noCvPage.on('pageerror', (e) => noCvErrors.push(e.message));
+await noCvPage.route('**/data/cv.js', (r) => r.fulfill({ status: 404, body: '' }));
+await noCvPage.goto(base, { waitUntil: 'networkidle' });
+const noCv = await noCvPage.evaluate(() => { const o = (window.OH_DATA || []).find((r) => (r.contacts || []).length >= 2); return o ? { id: o.id, name: o.contacts[1].name } : null; });
+check(!!noCv, '(setup) a role with two contacts, for the missing-CV check');
+if (noCv) {
+  await noCvPage.evaluate((id) => document.querySelector(`.card[data-id="${id}"] .act-pick[data-i="1"]`).click(), noCv.id);
+  const nc = noCvPage.locator(`.card[data-id="${noCv.id}"]`);
+  check(noCvErrors.length === 0 && (await nc.locator('.composer-title').innerText()).includes(noCv.name) && (await nc.locator('.act-cv').count()) === 0, `without the CV file there is no Download CV button and picking another contact still works (${noCvErrors.join(' | ') || 'no errors'})`);
+}
+await noCvPage.close();
 
 // Edited drafts are per recipient: editing under one contact must not leak into another recipient's draft
 await card.locator('.tab[data-tab="email"]').click();

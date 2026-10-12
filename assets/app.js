@@ -508,7 +508,7 @@
     }
     // Email links can't attach files, so a message that says the CV is attached points to Download CV.
     const cvBtn = $('.act-cv', el), cvHint = $('.cv-hint', el);
-    if (!CV) cvBtn.remove();
+    if (!CV && cvBtn) cvBtn.remove(); // renderComposer runs again on the same card when you pick another contact
     const attachReminder = () => (CV && SAYS_ATTACHED.test(body.value) ? ' The email says your CV is attached: download it here and add it before you send.' : '');
     function syncSendLink() { linkTo($('.act-send', el), mailLink(recipient().email, subj.value, body.value)); cvHint.hidden = !attachReminder(); }
     function loadDrafts() {
@@ -534,10 +534,10 @@
       const r = recipient();
       markContacted('email');
       const more = attachReminder();
-      if (HOST && !isHttp(mailLink('', '', ''))) toast(`Marked as contacted. If no email opened, use Copy, or choose Gmail or Outlook in Your details.${more}`, more ? 'notice' : '');
-      else toast(`${r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.'}${more}`, more ? 'notice' : '');
+      if (HOST && !isHttp(mailLink('', '', ''))) toast(`Marked as contacted. If no email opened, use Copy, or choose Gmail or Outlook in Your details.${more}`, more ? 'info' : '');
+      else toast(`${r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.'}${more}`, more ? 'info' : '');
     };
-    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); if (ok) { const more = attachReminder(); toast(`Email copied.${more}`.trim(), more ? 'notice' : ''); } else toast('Copy failed. Select the text and copy it yourself.', 'alert'); };
+    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); if (ok) { const more = attachReminder(); toast(`Email copied.${more}`.trim(), more ? 'info' : ''); } else toast('Copy failed. Select the text and copy it yourself.', 'alert'); };
     if (CV) cvBtn.onclick = async () => toastSaved(await download(CV.filename || 'CV.pdf', cvBlob(), 'application/pdf'), 'CV saved. Add it to your email before you send.');
     // The link opens LinkedIn; the click copies the message (inside the click, so the clipboard allows it).
     $$('.act-linkedin', el).forEach((b) => { b.onclick = () => {

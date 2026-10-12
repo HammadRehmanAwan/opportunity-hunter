@@ -71,7 +71,7 @@ if (profile.retired_cv_urls !== undefined) {
     if (!isHttp(profile.cv_url)) errors.push('data/profile.json: retired_cv_urls needs a cv_url to show instead');
     else if (profile.cv_url.includes(u)) errors.push(`data/profile.json: retired link ${u} is part of cv_url`);
     if (String(profile.signature || '').includes(u)) errors.push(`data/profile.json: signature still has the retired link ${u}`);
-    src.opportunities.forEach((o) => Object.entries(o.drafts || {}).forEach(([k, t]) => { if (String(t).includes(u)) errors.push(`${o.id}: ${k} still has the retired link ${u}; use {{my_cv}}`); }));
+    src.opportunities.forEach((o) => Object.entries(o.drafts || {}).forEach(([k, t]) => { if (String(t).includes(u)) errors.push(`${o.id}: ${k} still has the retired link ${u}; ${k === 'email_body' ? 'remove it (the email attaches the CV)' : 'use {{my_cv}}'}`); }));
   });
 }
 // The CV the emails say is attached. It is copied into data/cv.js so the page can offer it from a file, on the site and in the Claude page.
