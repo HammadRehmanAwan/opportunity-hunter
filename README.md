@@ -34,7 +34,7 @@ Pushing to this repo only runs **Validate data** (`.github/workflows/ci.yml`): i
   - if the page can't reach your Claude account, it says so. With a copy already in this browser it carries on from that copy, and reloading the page once the account is back sends the changes. Otherwise changes last only until you close the page;
   - progress saved without an account id by an earlier version of the page is deleted from the browser, not imported (that version had already uploaded it to its owner's account);
   - email defaults to Gmail in the browser, because email-app (`mailto:`) links often don't open from a Claude page;
-  - CSV and backup files go through Claude's save prompt;
+  - CSV, backup and CV files go through Claude's save prompt;
   - *Clear everything* needs a second, separate click, because the page can't show a confirmation dialog. It clears progress, notes and edited messages; Your details are kept.
 
 ## How the one-click actions work
@@ -42,6 +42,7 @@ Pushing to this repo only runs **Validate data** (`.github/workflows/ci.yml`): i
 | Button | What happens |
 |---|---|
 | **Send email ↗** | Opens your mail client (or Gmail / Outlook web, per your profile) with the recipient, subject and body pre-filled. Marks the opportunity *Contacted*. |
+| **Download CV** | Saves your CV as a PDF (`Hammad_Rehman_CV.pdf`). The emails say the CV is attached, but email links can't attach files, so you add this file to the new email yourself (drag it in, or use the paperclip) before sending. When a message says it is attached, the panel and the send buttons remind you. |
 | **Copy note & open LinkedIn ↗** | Copies the connection note (≤ 300 chars) to the clipboard and opens the person's LinkedIn profile so you can paste it under *Connect → Add a note*. |
 | **Copy message & open LinkedIn ↗** | Same, for a longer message / InMail. |
 | **Draft to &lt;name&gt;** | Switches the outreach drafts to that contact and fills `{{first_name}}`, `{{contact_title}}` etc. |
@@ -75,6 +76,8 @@ verification: { job_status (live_fetched|listed_recently|unconfirmed|closed), jo
 ```
 
 Placeholders available in drafts: `{{first_name}}`, `{{contact_name}}`, `{{contact_title}}`, `{{company}}`, `{{role}}`, `{{my_name}}`, `{{my_first_name}}`, `{{my_email}}`, `{{my_linkedin}}`, `{{my_phone}}`, `{{my_cv}}`, `{{my_headline}}`, `{{signature}}`.
+
+**The CV.** `assets/Hammad_Rehman_CV.pdf` is the CV that emails attach: replace that file and run `node scripts/build-data.mjs`, which copies it into `data/cv.js` (committed, so the page works from a file and in the Claude page). Every `email_body` must say the CV is attached and must not use `{{my_cv}}`; LinkedIn messages keep `{{my_cv}}`, a link to the same PDF in the portfolio repo (`cv_url` in `data/profile.json`). The data check fails otherwise.
 
 `data/profile.json` holds the default details used in every draft. If the CV link (`cv_url`) ever changes, put the old link in `retired_cv_urls`: details and edited messages saved with an old link then show, copy and send the current one (what is saved is left as it was), and `build-data.mjs` fails if a draft or the signature hard-codes a retired link.
 

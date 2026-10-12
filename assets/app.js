@@ -66,6 +66,11 @@
     name: 'Your name', email: 'you@example.com', phone: '', linkedin: '', cv_url: '', headline: '',
     mail_client: 'mailto', signature: '',
   }, window.OH_PROFILE || {});
+  // The CV PDF that emails say is attached (data/cv.js, made by scripts/build-data.mjs from assets/Hammad_Rehman_CV.pdf).
+  // It travels inside the page so the Download CV button works from a file, on the site and in the Claude page.
+  const CV = window.OH_CV && typeof window.OH_CV.base64 === 'string' && window.OH_CV.base64 ? window.OH_CV : null;
+  const SAYS_ATTACHED = /\battach/i;
+  function cvBlob() { const bin = atob(CV.base64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i); return new Blob([bytes], { type: 'application/pdf' }); }
   // CV links the defaults used to give (see currentLinks). They are not a detail you can edit.
   const RETIRED_CV_URLS = [].concat(DEFAULT_PROFILE.retired_cv_urls || []); delete DEFAULT_PROFILE.retired_cv_urls;
   // mailto: links often do nothing inside the artifact viewer, so default to Gmail there.
@@ -501,7 +506,11 @@
       const li = c && isHttp(c.linkedin_url) ? c.linkedin_url : peopleSearchUrl(o);
       $$('.act-linkedin', el).forEach((a) => linkTo(a, li));
     }
-    function syncSendLink() { linkTo($('.act-send', el), mailLink(recipient().email, subj.value, body.value)); }
+    // Email links can't attach files, so a message that says the CV is attached points to Download CV.
+    const cvBtn = $('.act-cv', el), cvHint = $('.cv-hint', el);
+    if (!CV) cvBtn.remove();
+    const attachReminder = () => (CV && SAYS_ATTACHED.test(body.value) ? ' The email says your CV is attached: download it here and add it before you send.' : '');
+    function syncSendLink() { linkTo($('.act-send', el), mailLink(recipient().email, subj.value, body.value)); cvHint.hidden = !attachReminder(); }
     function loadDrafts() {
       const c = current(); const k = key(); let anyEdited = false;
       Object.entries(fields).forEach(([f, input]) => { const d = draft(o, k, f); input.value = d.edited ? currentLinks(d.text) : fill(d.text, o, c); anyEdited = anyEdited || d.edited; });
@@ -524,10 +533,12 @@
     $('.act-send', el).onclick = () => {
       const r = recipient();
       markContacted('email');
-      if (HOST && !isHttp(mailLink('', '', ''))) toast('Marked as contacted. If no email opened, use Copy, or choose Gmail or Outlook in Your details.');
-      else toast(r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.');
+      const more = attachReminder();
+      if (HOST && !isHttp(mailLink('', '', ''))) toast(`Marked as contacted. If no email opened, use Copy, or choose Gmail or Outlook in Your details.${more}`, more ? 'notice' : '');
+      else toast(`${r.email ? `Opening your email to ${r.email}. Marked as contacted.` : 'Opening your email. Add the address before sending.'}${more}`, more ? 'notice' : '');
     };
-    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); if (ok) toast('Email copied'); else toast('Copy failed. Select the text and copy it yourself.', 'alert'); };
+    $('.act-copy-email', el).onclick = async () => { const ok = await copyText(`Subject: ${subj.value}\n\n${body.value}`); if (ok) { const more = attachReminder(); toast(`Email copied.${more}`.trim(), more ? 'notice' : ''); } else toast('Copy failed. Select the text and copy it yourself.', 'alert'); };
+    if (CV) cvBtn.onclick = async () => toastSaved(await download(CV.filename || 'CV.pdf', cvBlob(), 'application/pdf'), 'CV saved. Add it to your email before you send.');
     // The link opens LinkedIn; the click copies the message (inside the click, so the clipboard allows it).
     $$('.act-linkedin', el).forEach((b) => { b.onclick = () => {
       const c = current(); const text = b.dataset.kind === 'note' ? note.value : inmail.value;

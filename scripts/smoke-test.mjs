@@ -3,7 +3,7 @@
 // Usage: node scripts/smoke-test.mjs [--fixture]   (--fixture uses scripts/fixture-data.js instead of data/opportunities.js)
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { extname, join, normalize, sep } from 'node:path';
 import { statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -133,6 +133,23 @@ const nav2 = await page.evaluate(() => window.__nav);
 check(nav2.length === 2 && /^https:\/\/(www\.)?linkedin\.com\/(in|pub|search)\//.test(nav2[1]), "LinkedIn button opens the contact's profile or a people search, not the placeholder");
 const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
 check(clip === note, 'LinkedIn button copied the note to the clipboard');
+
+// Emails say the CV is attached. Email links can't attach files, so the composer offers the CV to download.
+const cvFile = readFileSync(join(root, 'assets', 'Hammad_Rehman_CV.pdf'));
+check(await page.evaluate(() => (window.OH_DATA || []).every((o) => /attach/i.test(o.drafts.email_body) && !/\{\{\s*my_cv\s*\}\}/.test(o.drafts.email_body) && /\{\{\s*my_cv\s*\}\}/.test(o.drafts.linkedin_inmail))) || useFixture, 'every email says the CV is attached and has no CV link; LinkedIn messages keep the link');
+await card.locator('.tab[data-tab="email"]').click();
+check(await card.locator('.act-cv').isVisible(), 'the email panel offers Download CV');
+check((await card.locator('.d-email').inputValue()).match(/attach/i) !== null && await card.locator('.cv-hint').isVisible(), 'a message that says the CV is attached shows how to attach it');
+const [cvDl] = await Promise.all([page.waitForEvent('download'), card.locator('.act-cv').click()]);
+const cvGot = Buffer.concat(await (await cvDl.createReadStream()).toArray());
+check(cvDl.suggestedFilename() === 'Hammad_Rehman_CV.pdf' && cvGot.equals(cvFile) && cvGot.subarray(0, 5).toString() === '%PDF-', `Download CV gives the CV PDF, byte for byte (${cvGot.length} bytes)`);
+await card.locator('.act-send').click();
+check(/CV is attached/.test(await page.locator('#toast').innerText()), 'sending an email that says the CV is attached reminds you to add it');
+const attachedBody = await card.locator('.d-email').inputValue();
+await card.locator('.d-email').fill(attachedBody.replace(/attach\w*/gi, 'included'));
+check(await card.locator('.cv-hint').isHidden(), 'the how-to-attach hint goes away when the message no longer says so');
+await card.locator('.act-reset[data-field="email"]').click();
+check((await card.locator('.d-email').inputValue()) === attachedBody && await card.locator('.cv-hint').isVisible(), 'undoing the edit brings the message and the hint back');
 
 // Edited drafts are per recipient: editing under one contact must not leak into another recipient's draft
 await card.locator('.tab[data-tab="email"]').click();
@@ -324,7 +341,7 @@ const fakeClaude = (seed) => {
   const caps = {
     db: flag('__nodb') ? null : db,
     user: flag('__nouser') ? null : Object.assign({ id: async () => uid }, flag('__can') ? { can: async () => { if (flag('__can') === 'throw') throw new Error('test'); return flag('__can') === 'true'; } } : {}),
-    downloads: flag('__nodl') ? null : { save: async ({ filename, data }) => { window.__saves.push({ filename, data: String(data) }); return { status: 'saved' }; } },
+    downloads: flag('__nodl') ? null : { save: async ({ filename, data }) => { const bin = typeof data !== 'string'; window.__saves.push({ filename, data: bin ? '' : String(data), size: bin ? data.size : data.length, head: bin ? await data.slice(0, 5).text() : '' }); return { status: 'saved' }; } },
   };
   const slow = Number(flag('__slow') || 0);
   window.claude = Object.freeze({ use: async (n) => { if (slow) await new Promise((r) => { setTimeout(r, slow); }); return caps[n] || null; } });
@@ -405,6 +422,12 @@ await vpage.click('#btn-export');
 await vpage.waitForFunction(() => window.__saves.length > 0, null, { timeout: 5000 }).catch(() => {});
 const saved = await vpage.evaluate(() => window.__saves[0]);
 check(saved && saved.filename === 'opportunity-hunter.csv' && saved.data.startsWith('company,role,'), 'viewer: CSV goes through the save prompt');
+const vcvCount = await vpage.evaluate(() => window.__saves.length);
+await vcard.locator('.tab[data-tab="email"]').click();
+await vcard.locator('.act-cv').click();
+await vpage.waitForFunction((n) => window.__saves.length > n, vcvCount, { timeout: 5000 }).catch(() => {});
+const vcvSaved = await vpage.evaluate(() => window.__saves[window.__saves.length - 1]);
+check(vcvSaved && vcvSaved.filename === 'Hammad_Rehman_CV.pdf' && vcvSaved.size === cvFile.length && vcvSaved.head === '%PDF-' && vcvSaved.size > 1000, 'viewer: Download CV goes through the save prompt as the PDF');
 
 const ids = await vpage.evaluate(() => [...document.querySelectorAll('.card')].map((c) => c.dataset.id));
 const [, , id3, id4, id5] = ids;

@@ -283,8 +283,11 @@
               <a class="btn btn-primary act-send" href="#"><span class="send-label">Open in your email app</span>
                 <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
               <button type="button" class="btn btn-ghost act-copy-email">Copy</button>
+              <button type="button" class="btn btn-ghost act-cv">
+                <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Download CV</button>
               <button type="button" class="btn btn-link act-reset" data-field="email" hidden>Undo my edits</button>
             </div>
+            <p class="fine cv-hint" hidden>This message says your CV is attached. Email links can't attach files, so press <b>Download CV</b>, then drag the file into the new email (or use the paperclip) before you send.</p>
           </div>
           <div class="pane" data-pane="note" hidden>
             <label>Invite note <span class="count note-count"></span><textarea class="d-note" rows="4" maxlength="300"></textarea></label>
@@ -314,6 +317,7 @@
 </template>
 
 <script src="data/opportunities.js"></script>
+<script src="data/cv.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>
